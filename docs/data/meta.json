@@ -1,0 +1,13 @@
+{
+ "n_trees_register": 229013,
+ "n_trees": 228091,
+ "n_parks": 5797,
+ "n_edges": 290709,
+ "maxgap": 4.0,
+ "kinds": {
+  "green": 3673,
+  "allotment": 2054,
+  "cemetery": 70
+ },
+ "crown_median_m": 8.0
+}

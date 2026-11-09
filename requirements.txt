@@ -1,0 +1,7 @@
+geopandas>=0.14
+shapely>=2
+scipy
+numpy
+pandas
+pyarrow
+pyogrio
