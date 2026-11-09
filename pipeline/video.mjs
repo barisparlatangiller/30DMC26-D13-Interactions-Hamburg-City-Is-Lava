@@ -1,6 +1,6 @@
 // LinkedIn media, rendered from the built site (GitHub Actions, commit message with [video] or [posters]):
-//   media/post1_islands.png · post2_route.png · post3_new_tree.png (1080×1350) · day13_city_is_lava.mp4 (~20 s) · thumb_full.jpg · cover.png
-//   node pipeline/video.mjs        (POSTERS_ONLY=1 skips the video)
+//   media/post1_islands.png · post2_route.png · post3_extend_route.png (1080×1350) · day13_city_is_lava.mp4 (12 s) · thumb_full.jpg · cover.png
+//   node pipeline/video.mjs        (POSTERS_ONLY=1 skips the video · SHARD=i NSHARD=n renders only frame block i of n, for parallel jobs)
 import { chromium } from "playwright";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -35,8 +35,9 @@ async function newPage(o) {
 const ready = p => p.waitForFunction(() => window.S && S.ready, null, { timeout: 180000 });
 const settle = p => p.evaluate(() => new Promise(r => { let d = false; const f = () => { if (!d) { d = true; setTimeout(r, 30); } }; S.map.once("idle", f); S.map.triggerRepaint(); setTimeout(f, 4000); }));
 
+const SHARD = +(process.env.SHARD || 0), NSHARD = +(process.env.NSHARD || 1), FIRST = SHARD === 0;
 // hub thumbnail: the desktop page in Squirrel Mode around the longest route
-{
+if (FIRST) {
   const p = await newPage({ viewport: { width: 1440, height: 900 } });
   await p.goto(URL, { waitUntil: "networkidle" }); await ready(p);
   await p.evaluate(() => { S.manual = true; setJump(2); S.map.jumpTo({ center: [9.948, 53.5905], zoom: 14.6, pitch: 40, bearing: -10 }); });
@@ -132,15 +133,15 @@ const T_HARD = { big: "<b>228,091</b> street-tree crowns.<br><em>133,424</em> se
 const T_SQ = { big: "Jumps up to 2 m:<br>still <em>100,024</em> groups.", sm: "71,883 trees stand alone. Even 4 m jumps would link at most 500 trees." };
 const T_ROUTE = { big: "The best route: <b>1.28 km</b><br>over 102 crowns.", sm: "Stellingen, Koppelstraße → Hagenbeckstraße, next to the zoo. 93 of the 102 trees are lindens. Its group: 324 trees, 36 green areas." };
 
-// ── posters ──
-for (const [name, o] of [
+// ── posters (first shard only) ──
+if (FIRST) for (const [name, o] of [
   ["post1_islands", { jump: 0, ...CITY, zoom: 10.85, q: Q, ...T_HARD }],
   ["post2_route", { jump: 2, sel: true, anim: 1, ...ROUTE, q: Q, ...T_ROUTE }],
 ]) {
   await scene(p, o); await settle(p); await p.waitForTimeout(1200); await scene(p, o); await settle(p);
   await p.screenshot({ path: `${OUT}/${name}.png` }); console.log("poster", name);
 }
-{ // poster 3: the 5 suggested trees, planted, and the longer route
+if (FIRST) { // poster 3: the 5 suggested trees, planted, and the longer route
   const o = { jump: 2, sel: true, keep: true, ...ROUTE_X, q: Q };
   await scene(p, { ...o, ext: true, showExt: true, anim: 1 });
   const X = await p.evaluate(() => S.extResult);
@@ -163,30 +164,32 @@ const CLOSE0 = { center: [R.start[0] + 0.0004, R.start[1] - 0.0006], zoom: 17.9,
 const CLOSE1 = { center: [R.start[0] + 0.0002, R.start[1] - 0.0004], zoom: 17.3, pitch: 58, bearing: -20 };
 const plan = [], sec = s => Math.round(s * FPS);
 const seg = (n, fn) => { for (let i = 0; i < n; i++) plan.push(fn(n > 1 ? i / (n - 1) : 1)); };
-seg(sec(3), k => ({ jump: 0, ...cam(CLOSE0, CLOSE1, ease(k)), q: Q, big: "Every street tree is a crown.", sm: "Crowns that touch form a path through the trees. Everything else is lava." }));
-seg(sec(4.5), k => ({ jump: 0, ...cam(CLOSE1, CITY, ease(k)), ...T_HARD }));
-seg(sec(1), () => ({ jump: 0, ...CITY }));
-seg(sec(2.2), k => ({ jump: 2, ...cam(CITY, { ...CITY, zoom: CITY.zoom + 0.15 }, k), ...T_SQ }));
-seg(sec(3), k => ({ jump: 2, sel: k > 0.35, ...cam({ ...CITY, zoom: CITY.zoom + 0.15 }, ROUTE, ease(k)), big: "Where can a squirrel get furthest?", sm: "The largest canopy group in Squirrel Mode: 324 trees and 36 green areas in Stellingen." }));
-seg(sec(5.5), k => ({ jump: 2, sel: true, anim: ease(Math.min(1, k * 1.08)), ...cam(ROUTE, { ...ROUTE, zoom: ROUTE.zoom + 0.25, bearing: ROUTE.bearing + 14 }, k), ...T_ROUTE }));
-const R2 = { ...ROUTE, zoom: ROUTE.zoom + 0.25, bearing: ROUTE.bearing + 14 };
-seg(sec(2), k => ({ jump: 2, sel: true, anim: 1, showExt: true, ...cam(R2, ROUTE_X, ease(k)), big: "Can new trees make it longer?", sm: "Pink rings: the 5 spots where one planted tree (8 m crown) would let the squirrel jump on, chosen one by one for the longest route." }));
-seg(sec(5.5), k => ({ jump: 2, sel: true, keep: true, ext: true, showExt: true, anim: ease(Math.min(1, k * 1.1)), ...cam(ROUTE_X, { ...ROUTE_X, zoom: ROUTE_X.zoom + 0.2, bearing: ROUTE_X.bearing + 12 }, k), extCap: true }));
-seg(sec(2.8), k => ({ jump: 2, sel: true, keep: true, ext: true, showExt: true, anim: 1, ...cam({ ...ROUTE_X, zoom: ROUTE_X.zoom + 0.2, bearing: ROUTE_X.bearing + 12 }, { ...ROUTE_X, zoom: ROUTE_X.zoom + 0.1, bearing: ROUTE_X.bearing + 16 }, k), card: Math.min(1, k * 3) }));
+// 12 s: close-up → city → Squirrel Mode → into Stellingen → the squirrel runs → 5 new trees, longer run → card
+const RX2 = { ...ROUTE_X, zoom: ROUTE_X.zoom + 0.15, bearing: ROUTE_X.bearing + 10 };
+seg(sec(1.6), k => ({ jump: 0, ...cam(CLOSE0, CLOSE1, ease(k)), q: Q, big: "Every street tree is a crown.", sm: "Crowns that touch form a path. Everything else is lava." }));
+seg(sec(2.2), k => ({ jump: 0, ...cam(CLOSE1, CITY, ease(k)), ...T_HARD }));
+seg(sec(1.2), k => ({ jump: 2, ...cam(CITY, { ...CITY, zoom: CITY.zoom + 0.1 }, k), ...T_SQ }));
+seg(sec(1.4), k => ({ jump: 2, sel: k > 0.3, ...cam({ ...CITY, zoom: CITY.zoom + 0.1 }, ROUTE, ease(k)), big: "Where does a squirrel get furthest?", sm: "The largest group in Squirrel Mode: 324 trees and 36 green areas in Stellingen." }));
+seg(sec(2), k => ({ jump: 2, sel: true, anim: ease(Math.min(1, k * 1.1)), ...cam(ROUTE, { ...ROUTE_X, zoom: ROUTE.zoom }, ease(k)), ...T_ROUTE }));
+seg(sec(2.2), k => ({ jump: 2, sel: true, keep: true, ext: true, showExt: true, anim: ease(Math.min(1, k * 1.15)), ...cam({ ...ROUTE_X, zoom: ROUTE.zoom }, RX2, ease(k)), extCap: true }));
+seg(sec(1.4), k => ({ jump: 2, sel: true, keep: true, ext: true, showExt: true, anim: 1, ...RX2, card: Math.min(1, k * 2.5) }));
 
 // warm-up so the squirrel icon is loaded before the first frame that needs it
-await scene(p, { ...plan[sec(15)] }); await settle(p); await p.waitForTimeout(1500);
+const lo = Math.floor(plan.length * SHARD / NSHARD), hi = Math.floor(plan.length * (SHARD + 1) / NSHARD);
+await scene(p, { ...plan[sec(8.6)] }); await settle(p); await p.waitForTimeout(1500);
+await p.evaluate(() => { S.added = []; S.pos = null; S.extResult = null; S.showExt = false; refresh(false); });
 let n = 0;
 const ONLY = process.env.FRAMES ? new Set(process.env.FRAMES.split(",").map(Number)) : null;   // test: render a few frames only
 for (const o of plan) {
-  if (ONLY && !ONLY.has(n)) { n++; continue; }
+  if ((ONLY && !ONLY.has(n)) || (!ONLY && (n < lo || n >= hi))) { n++; continue; }
   await scene(p, o); await settle(p);
   await p.screenshot({ path: `${FR}/f${String(n).padStart(4, "0")}.png` }); n++;
   if (n % 48 === 0) console.log("frame", n, "/", plan.length, new Date().toISOString());
 }
 if (ONLY) { console.log("plan", plan.length); process.exit(0); }
-fs.copyFileSync(`${FR}/f${String(sec(16.5)).padStart(4, "0")}.png`, `${OUT}/cover.png`);
 await br.close();
+if (NSHARD > 1) { console.log(`shard ${SHARD}: frames ${lo}–${hi - 1} of ${plan.length}`); process.exit(0); }   // the encode job joins the shards
+fs.copyFileSync(`${FR}/f${String(sec(9.5)).padStart(4, "0")}.png`, `${OUT}/cover.png`);
 execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(FPS), "-i", `${FR}/f%04d.png`,
   "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p", "-movflags", "+faststart", `${OUT}/day13_city_is_lava.mp4`]);
 console.log(`${n} frames, ${(n / FPS).toFixed(1)} s, ${(fs.statSync(`${OUT}/day13_city_is_lava.mp4`).size / 1e6).toFixed(2)} MB`);

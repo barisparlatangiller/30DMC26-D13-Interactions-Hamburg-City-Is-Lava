@@ -27,10 +27,15 @@ jobs:
     steps:
       - id: d
         uses: actions/deploy-pages@v4
+  # LinkedIn media: the 12 s video is rendered in 6 parallel blocks (software WebGL on CPU runners is slow), then joined
   media:
     if: contains(github.event.head_commit.message, '[video]') || contains(github.event.head_commit.message, '[posters]')
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,14 +44,34 @@ jobs:
         shell: bash -eo pipefail {0}
         env:
           POSTERS_ONLY: ${{ !contains(github.event.head_commit.message, '[video]') && '1' || '' }}
+          SHARD: ${{ matrix.shard }}
+          NSHARD: 6
+        run: |
+          if [ -n "$POSTERS_ONLY" ] && [ "$SHARD" != "0" ]; then exit 0; fi
+          npm i --no-save playwright@1.48.2 > /dev/null && npx playwright install --with-deps chromium > /dev/null
+          mkdir -p media && node pipeline/video.mjs 2>&1 | tee media/render_${SHARD}.log
+      - uses: actions/upload-artifact@v4
+        with: { name: "media-${{ matrix.shard }}", path: media, retention-days: 3 }
+  encode:
+    needs: media
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: "media-*", path: parts }
+      - name: Join frames and encode
         run: |
           sudo apt-get install -y -q ffmpeg > /dev/null || true
-          npm i --no-save playwright@1.48.2 > /dev/null && npx playwright install --with-deps chromium > /dev/null
-          mkdir -p media && node pipeline/video.mjs 2>&1 | tee media/render.log
+          mkdir -p media/frames && cp parts/media-0/*.png parts/media-0/*.jpg media/ 2>/dev/null || true
+          cp parts/*/frames/*.png media/frames/ 2>/dev/null || true
+          cat parts/*/render_*.log > media/render.log || true
+          N=$(ls media/frames | wc -l); echo "frames: $N"
+          if [ "$N" -gt 0 ]; then
+            ffmpeg -y -loglevel error -framerate 24 -i media/frames/f%04d.png -c:v libx264 -preset veryfast -crf 21 -pix_fmt yuv420p -movflags +faststart media/day13_city_is_lava.mp4
+            cp media/frames/f0228.png media/cover.png || true
+          fi
+          rm -rf media/frames && ls -la media
       - name: Push to media branch
-        if: always()
         run: |
-          mkdir -p /tmp/m && cp media/*.png media/*.jpg media/*.mp4 media/*.log /tmp/m/ 2>/dev/null || true
-          cd /tmp/m && git init -q -b media && git config user.name Claude && git config user.email noreply@anthropic.com
+          cd media && git init -q -b media && git config user.name Claude && git config user.email noreply@anthropic.com
           git add . && git commit -qm "Rendered media ($(date -u +%F))"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" media
