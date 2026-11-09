@@ -1,0 +1,21 @@
+poster post1_islands
+poster post2_route
+poster post3_extend_route {
+  before: 1.279136193781981,
+  after: 1.779971574469967,
+  sz0: 324,
+  sz1: 405,
+  n: 5
+}
+frame 48 / 289 2026-11-09T12:33:35.769Z
+shard 0: frames 0–47 of 289
+frame 96 / 289 2026-11-09T12:36:22.800Z
+shard 1: frames 48–95 of 289
+frame 144 / 289 2026-11-09T12:34:25.406Z
+shard 2: frames 96–143 of 289
+frame 192 / 289 2026-11-09T12:38:58.236Z
+shard 3: frames 144–191 of 289
+frame 240 / 289 2026-11-09T12:39:16.357Z
+shard 4: frames 192–239 of 289
+frame 288 / 289 2026-11-09T12:35:51.272Z
+shard 5: frames 240–288 of 289
