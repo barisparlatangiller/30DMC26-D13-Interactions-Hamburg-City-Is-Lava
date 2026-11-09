@@ -70,8 +70,8 @@ const CSS = `
 `;
 const CHIPS = `<div class="chips"><span><i style="background:#ffb000"></i>reachable</span><span><i style="background:#168044"></i>group 50+</span>
   <span><i style="background:#40a860"></i>10–49</span><span><i style="background:#8cc88c"></i>2–9</span><span><i style="background:#c4bcb4"></i>alone</span>
-  <span><i style="background:#d5ead2;border:1px solid #a8cfa4"></i>park · cemetery · allotment</span><span><i style="background:#ff5a1f"></i>major road</span></div>`;
-const ATT = `<div class="att">Straßenbaumkataster & Digitaler Grünplan © FHH/BUKEA (dl-de/by-2-0) · roads © OpenStreetMap (ODbL) · © CARTO</div>`;
+  <span><i style="background:#d5ead2;border:1px solid #a8cfa4"></i>park · cemetery · allotment</span><span><i style="width:22px;height:0;border-radius:0;border-top:3px dashed #ff5a1f"></i>squirrel jump</span><span><i style="width:22px;height:6px;border-radius:3px;background:#c3bdb6"></i>major road</span><span><i style="background:#e2007a"></i>new tree</span></div>`;
+const ATT = `<div class="att">Straßenbaumkataster & Digitaler Grünplan © FHH/BUKEA (dl-de/by-2-0) · roads & buildings © OpenStreetMap (ODbL) · OpenFreeMap · © CARTO</div>`;
 
 async function open() {
   const p = await newPage({ viewport: { width: 1080, height: 1350 } });
@@ -80,7 +80,7 @@ async function open() {
   await p.goto(URL, { waitUntil: "networkidle" }); await ready(p);
   await p.addStyleTag({ content: CSS });
   await p.evaluate(({ CHIPS, ATT }) => {
-    S.manual = true; S.map.resize();
+    S.manual = true; S.showExt = false; S.map.resize();
     document.body.insertAdjacentHTML("beforeend", `<div class="shade"></div><div class="v top"><div class="eb">#30DayMapChallenge · Day 13 · Interactions · Hamburg</div>
       <h1>The City <span>Is Lava</span></h1><div class="q" id="vq"></div></div><div class="v bot"><div class="big" id="vb"></div><div class="sm" id="vs"></div>${CHIPS}${ATT}</div>`);
     // node of the route's first tree, so its whole group lights up
@@ -96,15 +96,20 @@ const scene = (p, o) => p.evaluate(o => {
   const want = o.sel ? S.routeNode : -1;
   if (!o.keep && want !== S.sel) select(want);
   if (o.plant && !S.added.length) { const c = S.crit[o.plant - 1]; plant(c.lon, c.lat); }
-  if (o.anim != null) { const c = S.A.route.coords; S.anim = { path: c, k: o.anim * (c.length - 1) }; } else S.anim = null;
+  if (o.ext && !S.extResult) { S.extPath = null; extendRoute({ noPlay: true }); S.extPath = S.lastPath; }
+  if (o.showExt != null) S.showExt = o.showExt;
+  S.pulse = (S.pulse || 0) + 0.35;
+  if (o.anim != null) { const c = o.ext ? S.extPath : S.A.route.coords; S.anim = { path: c, k: o.anim * (c.length - 1) }; } else S.anim = null;
   S.map.jumpTo({ center: o.center, zoom: o.zoom, pitch: o.pitch || 0, bearing: o.bearing || 0 });
-  redraw();
+  frame();
+  if (o.extCap && S.extResult) { const X = S.extResult; o.big = `${X.n} new trees:<br>route <em>${X.before.toFixed(2)}</em> → <b>${X.after.toFixed(2)} km</b>`;
+    o.sm = `The planted trees (pink) bridge the gaps, partly via parks as safe islands; the group grows from ${X.sz0} to ${X.sz1} trees and the squirrel gets ${Math.round((X.after / X.before - 1) * 100)}% further.`; }
   for (const [id, v] of [["vq", o.q], ["vb", o.big], ["vs", o.sm]]) if (v != null) document.getElementById(id).innerHTML = v;
   if (o.card != null) {
     if (!document.getElementById("c2")) document.body.insertAdjacentHTML("beforeend", `<div class="card2" id="c2"><h2>For a squirrel, Hamburg is <span>mostly lava</span></h2><ul>
       <li><b>228,091</b> street-tree crowns form <b>133,424</b> separate groups when crowns must touch.</li>
       <li>With 2 m jumps: still <b>100,024</b> groups, and <b>71,883</b> trees stand alone.</li>
-      <li>The largest group: <b>324 trees</b> and 36 green areas. One new tree at the right gap can join it to the next one.</li></ul>
+      <li>The largest group: <b>324 trees</b>. ${S.extResult ? `${S.extResult.n} new trees at the right gaps stretch its longest route from ${S.extResult.before.toFixed(2)} to <b>${S.extResult.after.toFixed(2)} km</b>.` : ""}</li></ul>
       <div class="url">Plant or remove trees yourself · barisparlatangiller.github.io</div>
       <div class="att">Straßenbaumkataster & Digitaler Grünplan © FHH/BUKEA (dl-de/by-2-0) · OpenStreetMap (ODbL)</div></div>`);
     document.getElementById("c2").style.opacity = o.card; document.querySelector(".v.bot").style.opacity = 1 - o.card;
@@ -116,6 +121,11 @@ const R = await p.evaluate(() => { const c = S.A.route.coords; let x0 = 1e9, y0 
   return { start: c[0], mid: [(x0 + x1) / 2, (y0 + y1) / 2], critB: [S.crit[5].lon, S.crit[5].lat] }; });
 const CITY = { center: [10.0, 53.572], zoom: 10.75 };
 const ROUTE = { center: [R.mid[0], R.mid[1] - 0.0012], zoom: 15.35, pitch: 48, bearing: -12 };
+// view that holds the route and the suggested trees
+const RX = await p.evaluate(() => { const c = S.A.route.coords.concat(S.ext.map(d => [d.lon, d.lat])); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; c.forEach(([x, y]) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }); return [(x0 + x1) / 2, (y0 + y1) / 2]; });
+const ROUTE_X = { center: [RX[0], RX[1] - 0.0016], zoom: 15.0, pitch: 50, bearing: -12 };
+const T_EXT = X => ({ big: `${X.n} new trees:<br>route <em>${X.before.toFixed(2)}</em> → <b>${X.after.toFixed(2)} km</b>`,
+  sm: `Pink: trees planted where a squirrel cannot jump yet (8 m crowns, gaps ≤ 2 m, never across a major road; parks count as safe islands). The group grows from ${X.sz0} to ${X.sz1} trees.` });
 const Q = "Can a squirrel cross Hamburg without touching the ground?";
 const T_HARD = { big: "<b>228,091</b> street-tree crowns.<br><em>133,424</em> separate groups.", sm: "Hard Mode: a squirrel only moves where crowns touch. Parks, cemeteries and allotments are safe islands. The rest is lava." };
 const T_SQ = { big: "Jumps up to 2 m:<br>still <em>100,024</em> groups.", sm: "71,883 trees stand alone. Even 4 m jumps would link at most 500 trees." };
@@ -129,16 +139,14 @@ for (const [name, o] of [
   await scene(p, o); await settle(p); await p.waitForTimeout(1200); await scene(p, o); await settle(p);
   await p.screenshot({ path: `${OUT}/${name}.png` }); console.log("poster", name);
 }
-{ // poster 3: before / after one new tree at critical gap 7 (joins the largest group)
-  const o = { jump: 2, center: [R.critB[0], R.critB[1] - 0.0009], zoom: 15.9, pitch: 45, bearing: 0, q: Q };
-  const info = await p.evaluate(() => S.crit[5]);
-  await scene(p, { ...o, plant: 6, keep: true });
-  const after = await p.evaluate(() => ({ size: S.size[S.root[S.N + S.NP]], parks: S.parksOf[S.root[S.N + S.NP]] }));
-  await scene(p, { ...o, keep: true, big: `One new tree joins<br><em>${info.a} + ${info.b}</em> trees into <b>${after.size}</b>.`,
-    sm: `A gap of ${info.gap_m} m between two crowns. One tree with an 8 m crown (pink) closes it, and the largest canopy group in Hamburg grows to ${after.size} trees and ${after.parks} green areas.` });
-  await settle(p); await p.waitForTimeout(800);
-  await p.screenshot({ path: `${OUT}/post3_new_tree.png` }); console.log("poster post3_new_tree", after);
-  await p.evaluate(() => { S.added = []; S.pos = null; refresh(false); select(-1); });
+{ // poster 3: the 5 suggested trees, planted, and the longer route
+  const o = { jump: 2, sel: true, keep: true, ...ROUTE_X, q: Q };
+  await scene(p, { ...o, ext: true, showExt: true, anim: 1 });
+  const X = await p.evaluate(() => S.extResult);
+  await scene(p, { ...o, ext: true, showExt: true, anim: 1, ...T_EXT(X) });
+  await settle(p); await p.waitForTimeout(1500); await scene(p, { ...o, ext: true, showExt: true, anim: 1, ...T_EXT(X) }); await settle(p);
+  await p.screenshot({ path: `${OUT}/post3_extend_route.png` }); console.log("poster post3_extend_route", X);
+  await p.evaluate(() => { S.added = []; S.pos = null; S.extResult = null; S.showExt = false; refresh(false); select(-1); });
 }
 if (process.env.POSTERS_ONLY) { await br.close(); process.exit(0); }
 
@@ -160,10 +168,13 @@ seg(sec(1), () => ({ jump: 0, ...CITY }));
 seg(sec(2.2), k => ({ jump: 2, ...cam(CITY, { ...CITY, zoom: CITY.zoom + 0.15 }, k), ...T_SQ }));
 seg(sec(3), k => ({ jump: 2, sel: k > 0.35, ...cam({ ...CITY, zoom: CITY.zoom + 0.15 }, ROUTE, ease(k)), big: "Where can a squirrel get furthest?", sm: "The largest canopy group in Squirrel Mode: 324 trees and 36 green areas in Stellingen." }));
 seg(sec(5.5), k => ({ jump: 2, sel: true, anim: ease(Math.min(1, k * 1.08)), ...cam(ROUTE, { ...ROUTE, zoom: ROUTE.zoom + 0.25, bearing: ROUTE.bearing + 14 }, k), ...T_ROUTE }));
-seg(sec(2.6), k => ({ jump: 2, sel: true, anim: 1, ...cam({ ...ROUTE, zoom: ROUTE.zoom + 0.25, bearing: ROUTE.bearing + 14 }, { ...ROUTE, zoom: ROUTE.zoom + 0.1, bearing: ROUTE.bearing + 18 }, k), card: Math.min(1, k * 3) }));
+const R2 = { ...ROUTE, zoom: ROUTE.zoom + 0.25, bearing: ROUTE.bearing + 14 };
+seg(sec(2), k => ({ jump: 2, sel: true, anim: 1, showExt: true, ...cam(R2, ROUTE_X, ease(k)), big: "Can new trees make it longer?", sm: "Pink rings: the 5 spots where one planted tree (8 m crown) would let the squirrel jump on, chosen one by one for the longest route." }));
+seg(sec(5.5), k => ({ jump: 2, sel: true, keep: true, ext: true, showExt: true, anim: ease(Math.min(1, k * 1.1)), ...cam(ROUTE_X, { ...ROUTE_X, zoom: ROUTE_X.zoom + 0.2, bearing: ROUTE_X.bearing + 12 }, k), extCap: true }));
+seg(sec(2.8), k => ({ jump: 2, sel: true, keep: true, ext: true, showExt: true, anim: 1, ...cam({ ...ROUTE_X, zoom: ROUTE_X.zoom + 0.2, bearing: ROUTE_X.bearing + 12 }, { ...ROUTE_X, zoom: ROUTE_X.zoom + 0.1, bearing: ROUTE_X.bearing + 16 }, k), card: Math.min(1, k * 3) }));
 
 // warm-up so the squirrel icon is loaded before the first frame that needs it
-await scene(p, { ...plan[sec(14)] }); await settle(p); await p.waitForTimeout(1500);
+await scene(p, { ...plan[sec(15)] }); await settle(p); await p.waitForTimeout(1500);
 let n = 0;
 const ONLY = process.env.FRAMES ? new Set(process.env.FRAMES.split(",").map(Number)) : null;   // test: render a few frames only
 for (const o of plan) {

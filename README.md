@@ -14,6 +14,8 @@ The map treats every street tree as a crown. Crowns that touch, or are close eno
 - **🌳 Plant / 🪓 Remove.** Add a tree with an 8 m crown, or cut one down, and see how many groups merge or split.
 - **Critical gaps.** These are 20 places where a single new tree would join two large groups. Tap one to fly there and plant it.
 - **🐿️ Squirrel route.** This shows the longest canopy path inside the selected group.
+- **🌱 Extend the route.** Pink rings mark 5 trees, chosen one by one, that make the longest route grow the most. One click plants them and runs the squirrel again.
+- **3D view.** From zoom 14 on, crowns are 3D and the possible jumps are dashed orange lines (a spanning forest: one chain per group, shortest jumps first). OpenStreetMap buildings are shown in 3D with an opacity slider, so the trees stay in front. Major roads are grey at roughly their real width.
 
 ## Findings
 
@@ -27,6 +29,7 @@ The map treats every street tree as a crown. Crowns that touch, or are close eno
 - Even 4 m jumps leave 70,821 groups, and the largest of them has 500 trees.
 - The longest path in the largest Squirrel-Mode group runs 1.28 km over 102 crowns in Stellingen, along Koppelstraße and Hagenbeckstraße next to the zoo. 93 of those 102 trees are lindens.
 - One new tree at the 11.4 m gap next to that group would join it with a group of 70 trees, giving 395 trees and 51 green areas.
+- Five planted trees next to that group stretch its longest route from 1.28 to 1.78 km (the group grows from 324 to 405 trees). Part of the gain comes from crossing parks, which count as safe islands.
 - So, for a squirrel, Hamburg is mostly lava. Street trees form short chains along streets, and those chains rarely connect.
 
 ## Data
@@ -34,6 +37,7 @@ The map treats every street tree as a crown. Crowns that touch, or are close eno
 - **Straßenbaumkataster Hamburg.** 229,013 street trees. The 228,091 with a crown diameter between 0 and 35 m are used. © Freie und Hansestadt Hamburg, BUKEA, licence dl-de/by-2-0.
 - **Digitaler Grünplan.** 3,673 public green areas, 2,054 allotment gardens and 70 cemeteries. © FHH, BUKEA, licence dl-de/by-2-0.
 - **Roads.** OpenStreetMap, © OpenStreetMap contributors (ODbL).
+- **Buildings.** OpenStreetMap via OpenFreeMap (OpenMapTiles).
 - **Basemap.** © CARTO.
 
 ## Method
@@ -41,7 +45,8 @@ The map treats every street tree as a crown. Crowns that touch, or are close eno
 1. Each crown is drawn as a circle with the recorded diameter. Two trees are linked if gap = distance − r₁ − r₂ ≤ 4 m. The gap is stored, so each model is just a threshold.
 2. A tree links to a green area if its crown comes within 4 m of the polygon. Green areas that touch or lie within 4 m of each other are linked too.
 3. Road flags come from the straight trunk-to-trunk line (bit 1 = major road, bit 2 = any road). Tunnels are excluded.
-4. Critical gaps are pairs of trees from two different Squirrel-Mode groups whose crowns are at most 12 m apart. A new 8 m crown placed between them closes both gaps to 2 m or less. Pairs whose line crosses a major road are skipped.
+4. Route extension is greedy. At each step it tries every gap between the group and a tree outside it that 1 new tree (≤ 12 m) or 2 new trees (≤ 22 m) can bridge, with equal gaps of ≤ 2 m and no major-road crossing. It keeps the option that adds the most route length per tree, up to 5 trees.
+5. Critical gaps are pairs of trees from two different Squirrel-Mode groups whose crowns are at most 12 m apart. A new 8 m crown placed between them closes both gaps to 2 m or less. Pairs whose line crosses a major road are skipped.
 
 ```bash
 python pipeline/build_network.py --data "<folder with the BUKEA JSON files and Hamburg_OSM_Roads.gpkg>"   # → docs/data/*
@@ -53,7 +58,7 @@ The raw inputs are too large for the repo, so `docs/data` is built locally and c
 
 ## Limits
 
-- Circles are not real branches. Crown height and shape are unknown, and so is whether two crowns above a road actually meet.
+- Circles are not real branches. In 3D, crown height (2.5 m trunk, crown about 1.15 × radius) is a sketch, not data. Crown shape is unknown, and so is whether two crowns above a road actually meet.
 - The 2 m jump is a starting assumption to compare against, not a measured squirrel jump.
 - Trees inside parks and on private land are not in the register. That is why parks count as whole islands, and why private gardens, which squirrels love, are missing.
 - A link is a possible path, not an observed squirrel.

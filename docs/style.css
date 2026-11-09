@@ -44,3 +44,5 @@ summary { cursor: pointer; color: var(--ink); font-weight: 600; } details b { co
 
 .maplibregl-popup-content { background: #fff; color: var(--ink); font-size: 12px; border-radius: 10px; }
 @media (max-width: 860px) { #map, #glow { inset: 0 0 50% 0; } .panel { top: 50%; width: 100%; border-left: 0; border-top: 1px solid var(--line); padding: 14px 16px; } h1 { font-size: 28px; } .q, .legend { display: none; } }
+.tool.ext { width: 100%; margin-top: 6px; background: #fff0f7; border-color: #f3a6cf; color: #b0005f; }
+.tool.ext:hover { background: #ffe0ef; }

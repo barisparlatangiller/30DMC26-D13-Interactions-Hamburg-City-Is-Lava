@@ -23,7 +23,7 @@ window.S = S;
 async function load() {
   const bin = u => fetch(u).then(r => r.arrayBuffer()), j = u => fetch(u).then(r => r.json());
   const [tb, eb, parks, roads, A, meta] = await Promise.all([bin("data/trees.bin?v=1"), bin("data/edges.bin?v=1"), j("data/parks.geojson?v=1"),
-    j("data/roads_major.geojson?v=1"), j("data/analysis.json?v=1"), j("data/meta.json?v=1")]);
+    j("data/roads_major.geojson?v=1"), j("data/analysis.json?v=2"), j("data/meta.json?v=1")]);
   const tv = new DataView(tb), N = tb.byteLength / 10;
   S.N = N; S.lon = new Float64Array(N); S.lat = new Float64Array(N); S.r = new Float32Array(N);
   for (let i = 0; i < N; i++) { S.lon[i] = tv.getFloat32(i * 10, true); S.lat[i] = tv.getFloat32(i * 10 + 4, true); S.r[i] = tv.getUint16(i * 10 + 8, true) / 10; }
@@ -59,6 +59,15 @@ function compute() {
   for (let i = 0; i < T; i++) if (size[i] > 0) { groups++; if (size[i] === 1) alone++; if (size[i] > largest) largest = size[i]; }
   let multi = 0; for (let i = 0; i < T; i++) if (size[i] > 0 && parks[i] >= 2) multi++;
   Object.assign(S, { root, size, parksOf: parks, stats: { groups, alone, largest, multi } });
+  // the squirrel's possible jumps (tree ↔ tree), drawn as dashed lines between crowns
+  // only a spanning forest (shortest jumps first), so each group reads as one chain instead of a ladder of every possible jump
+  if (!S.eord) { const d = new Float32Array(S.M); for (let i = 0; i < S.M; i++) { const a = S.ea[i], b = S.eb[i]; d[i] = b < N ? Math.hypot((S.lon[a] - S.lon[b]) * KX, (S.lat[a] - S.lat[b]) * KY) : 1e9; }
+    S.eord = Uint32Array.from({ length: S.M }, (_, i) => i).sort((x, y) => d[x] - d[y]); }
+  for (let i = 0; i < T; i++) par[i] = i;
+  const la = [], lb = [];
+  for (let q = 0; q < S.M; q++) { const i = S.eord[q], a = S.ea[i], b = S.eb[i]; if (b >= N) continue; if (ok(S.eg[i], S.ef[i]) && !S.removed[a] && !S.removed[b] && find(a) !== find(b)) { uni(a, b); la.push(a); lb.push(b); } }
+  S.added.forEach((t, k) => { if (t.gone) return; const n = N + NP + k; for (const l of t.links) if ((l.b < N || (l.b >= N + NP && !S.added[l.b - N - NP].gone)) && ok(l.g, l.f) && !S.removed[l.b] && find(n) !== find(l.b)) { uni(n, l.b); la.push(n); lb.push(l.b); } });
+  S.la = Int32Array.from(la); S.lb = Int32Array.from(lb); S.visKey = null;
 }
 function treeColour(i) {
   const N = S.N, ro = S.root[i], sz = S.size[ro];
@@ -83,7 +92,7 @@ function styleBase() {
       if (l.type === "background") map.setPaintProperty(l.id, "background-color", "#f3f1ed");
       else if (l.type === "fill" && /water/.test(l.id)) map.setPaintProperty(l.id, "fill-color", "#cfe0e8");
       else if (l.type === "fill") map.setPaintProperty(l.id, "fill-color", "#eeebe6");
-      else if (l.type === "line" && /road|bridge|tunnel|street|path/.test(l.id)) map.setPaintProperty(l.id, "line-color", "#dedad4");
+      else if (l.type === "line" && /road|bridge|tunnel|street|path/.test(l.id)) map.setPaintProperty(l.id, "line-color", "#d9d5cf");
       else if (l.type === "line" && /building/.test(l.id)) map.setLayoutProperty(l.id, "visibility", "none");
       else if (l.type === "fill-extrusion") map.setLayoutProperty(l.id, "visibility", "none");
     } catch (e) {}
@@ -94,44 +103,109 @@ function addLayers() {
   try {
     styleBase();
     map.addSource("parks", { type: "geojson", data: S.parks, promoteId: "id" });
-    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#ffe3a0", "#d5ead2"], "fill-opacity": 0.9 } });
+    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#fff0c4", "#d5ead2"], "fill-opacity": 0.85 } });
     map.addLayer({ id: "parks-l", type: "line", source: "parks", paint: { "line-color": ["case", ["boolean", ["feature-state", "reach"], false], "#f0a500", "#a8cfa4"], "line-width": 0.8 } });
+    // major roads in grey, drawn at roughly their real width (metres by class)
     map.addSource("roads", { type: "geojson", data: S.roadsGeo });
-    map.addLayer({ id: "roads-glow", type: "line", source: "roads", paint: { "line-color": "#ff5a1f", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3, 16, 14], "line-blur": 6, "line-opacity": 0.22 } });
-    map.addLayer({ id: "roads", type: "line", source: "roads", paint: { "line-color": "#ff5a1f", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 16, 3] } });
+    const wm = ["match", ["get", "fclass"], "motorway", 26, "trunk", 20, "primary", 16, "secondary", 12, 7];
+    const px = k => ["max", 0.6, ["*", k, wm]];                       // metres → pixels at lat 53.6 (92.9 m/px at z10)
+    map.addLayer({ id: "roads", type: "line", source: "roads", layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#c3bdb6", "line-width": ["interpolate", ["exponential", 2], ["zoom"], 10, px(1 / 92.9), 20, px(1024 / 92.9)] } });
+    // 3D buildings (OpenStreetMap via OpenFreeMap), half transparent so the trees stay in front
+    try {
+      map.addSource("ofm", { type: "vector", url: "https://tiles.openfreemap.org/planet", attribution: "Buildings: OpenFreeMap © OpenMapTiles © OpenStreetMap" });
+      map.addLayer({ id: "buildings", type: "fill-extrusion", source: "ofm", "source-layer": "building", minzoom: 13,
+        paint: { "fill-extrusion-color": "#d7d2cb", "fill-extrusion-height": ["coalesce", ["get", "render_height"], 9], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+          "fill-extrusion-opacity": S.bOp ?? 0.45 } });
+    } catch (e) { console.warn("buildings", e); }
     map.on("click", e => onClick(e));
     return true;
   } catch (e) { console.warn(e); return false; }
 }
-function deckLayers() {
+const Z3 = 14;                                         // from this zoom on, crowns are drawn in 3D
+const crownH = r => Math.max(3, r * 1.15), BASE = 2.5;  // crown thickness and trunk height (m): a sketch, the register has no heights
+const topZ = r => BASE + crownH(r);
+// low-poly crown: a squashed sphere, unit radius, centred
+const MESH = (() => { const P = [], Nn = [], I = [], LA = 6, LO = 12;
+  for (let a = 0; a <= LA; a++) { const t = Math.PI * a / LA; for (let o = 0; o <= LO; o++) { const f = 2 * Math.PI * o / LO, x = Math.sin(t) * Math.cos(f), y = Math.sin(t) * Math.sin(f), z = Math.cos(t); P.push(x, y, z); Nn.push(x, y, z); } }
+  for (let a = 0; a < LA; a++) for (let o = 0; o < LO; o++) { const p = a * (LO + 1) + o, q = p + LO + 1; I.push(p, q, p + 1, q, q + 1, p + 1); }
+  return { attributes: { positions: { value: new Float32Array(P), size: 3 }, normals: { value: new Float32Array(Nn), size: 3 } }, indices: { value: new Uint16Array(I), size: 1 } }; })();
+function nodeXY(n) { const N = S.N, NP = S.NP; return n < N ? [S.lon[n], S.lat[n], S.r[n]] : [S.added[n - N - NP].lon, S.added[n - N - NP].lat, S.added[n - N - NP].r]; }
+function colours() {                                    // one colour per drawn tree (index: trees, then added trees)
   const N = S.N, NP = S.NP, NA = S.added.length;
+  S.col = new Uint8Array((N + NA) * 4);
+  for (let i = 0; i < N + NA; i++) {
+    const node = i < N ? i : i + NP, gone = i < N ? S.removed[i] : S.added[i - N].gone;
+    const c = treeColour(node); S.col[i * 4] = c[0]; S.col[i * 4 + 1] = c[1]; S.col[i * 4 + 2] = c[2]; S.col[i * 4 + 3] = gone ? 0 : 240;
+  }
+  S.colVer = (S.colVer || 0) + 1; S.visKey = null;
+}
+function visible() {                                    // trees in view (3D draws only these, so it stays smooth)
+  const z = map.getZoom(), b = map.getBounds(), key = z >= Z3 ? [b.getWest(), b.getSouth(), b.getEast(), b.getNorth(), S.colVer].map(v => v.toFixed ? v.toFixed(4) : v).join() : "flat";
+  if (key === S.visKey) return; S.visKey = key; S.z3 = z >= Z3;
+  if (!S.z3) return;
+  const N = S.N, NA = S.added.length, padX = (b.getEast() - b.getWest()) * 0.15, padY = (b.getNorth() - b.getSouth()) * 0.15;
+  const w = b.getWest() - padX, e = b.getEast() + padX, so = b.getSouth() - padY, no = b.getNorth() + padY, idx = [];
+  for (let i = 0; i < N + NA; i++) { const lo = i < N ? S.lon[i] : S.added[i - N].lon, la = i < N ? S.lat[i] : S.added[i - N].lat; if (lo > w && lo < e && la > so && la < no && S.col[i * 4 + 3]) idx.push(i); }
+  const n = idx.length, pos = new Float32Array(n * 3), sc = new Float32Array(n * 3), col = new Uint8Array(n * 4);
+  idx.forEach((i, k) => { const r = i < N ? S.r[i] : S.added[i - N].r, h = crownH(r);
+    pos[3 * k] = i < N ? S.lon[i] : S.added[i - N].lon; pos[3 * k + 1] = i < N ? S.lat[i] : S.added[i - N].lat; pos[3 * k + 2] = BASE + h / 2;
+    sc[3 * k] = sc[3 * k + 1] = r; sc[3 * k + 2] = h / 2; col.set(S.col.subarray(i * 4, i * 4 + 4), k * 4); });
+  S.v3 = { idx: Int32Array.from(idx), pos, sc, col, n, ver: (S.v3?.ver || 0) + 1 };
+  // dashed jumps between crowns in view; the selected group's jumps are drawn stronger
+  const inV = new Uint8Array(N + NA + S.NP); idx.forEach(i => inV[i < N ? i : i + S.NP] = 1);
+  const ro = S.sel >= 0 ? S.root[S.sel] : -1, A = [], B = [];
+  for (let k = 0; k < S.la.length; k++) { const a = S.la[k], bb = S.lb[k]; if (inV[a] || inV[bb]) (ro >= 0 && S.root[a] === ro ? B : A).push(a, bb); }
+  const mk = L => { const m = L.length / 2, v = new Float32Array(m * 6), st = new Uint32Array(m);
+    for (let k = 0; k < m; k++) { const p = nodeXY(L[2 * k]), q = nodeXY(L[2 * k + 1]); v.set([p[0], p[1], topZ(p[2]) + 1.2, q[0], q[1], topZ(q[2]) + 1.2], 6 * k); st[k] = 2 * k; }
+    return { length: m, startIndices: st, attributes: { getPath: { value: v, size: 3 } } }; };
+  S.lnA = mk(A); S.lnB = mk(B);
+}
+function deckLayers() {
+  const N = S.N, NA = S.added.length;
+  if (S.colDirty || !S.col) { colours(); S.colDirty = false; }
   if (!S.pos || S.pos.length !== (N + NA) * 2) {
     S.pos = new Float32Array((N + NA) * 2); S.rad = new Float32Array(N + NA);
     for (let i = 0; i < N; i++) { S.pos[2 * i] = S.lon[i]; S.pos[2 * i + 1] = S.lat[i]; S.rad[i] = S.r[i]; }
     S.added.forEach((t, k) => { S.pos[2 * (N + k)] = t.lon; S.pos[2 * (N + k) + 1] = t.lat; S.rad[N + k] = t.r; });
   }
-  const col = new Uint8Array((N + NA) * 4);
-  for (let i = 0; i < N + NA; i++) {
-    const node = i < N ? i : i - N + N + NP; const gone = i < N ? S.removed[i] : S.added[i - N].gone;
-    const c = treeColour(node); col.set([c[0], c[1], c[2], gone ? 0 : 235], i * 4);
-    if (gone) S.rad[i] = 0;
+  visible();
+  const L = [];
+  if (!S.z3) L.push(new deck.ScatterplotLayer({ id: "crowns", data: { length: N + NA, attributes: { getPosition: { value: S.pos, size: 2 }, getRadius: { value: S.rad, size: 1 }, getFillColor: { value: S.col, size: 4 } } },
+    radiusUnits: "meters", radiusMinPixels: 0.8, pickable: true, autoHighlight: true, highlightColor: [226, 0, 122, 255], updateTriggers: { getFillColor: S.colVer, getRadius: S.colVer } }));
+  else {
+    const dash = new deck.PathStyleExtension({ dash: true });
+    L.push(new deck.PathLayer({ id: "jumps", data: S.lnA, _pathType: "open", getColor: [255, 90, 31, 210], getWidth: 2, widthUnits: "pixels", getDashArray: [3, 2], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
+    L.push(new deck.SimpleMeshLayer({ id: "crowns3d", data: { length: S.v3.n, attributes: { getPosition: { value: S.v3.pos, size: 3 }, getColor: { value: S.v3.col, size: 4 } } },
+      getScale: (_, { index }) => [S.v3.sc[3 * index], S.v3.sc[3 * index + 1], S.v3.sc[3 * index + 2]],
+      mesh: MESH, getOrientation: [0, 0, 0], pickable: true, autoHighlight: true, highlightColor: [226, 0, 122, 255], material: { ambient: 0.55, diffuse: 0.6, shininess: 12, specularColor: [40, 40, 40] },
+      updateTriggers: { getPosition: S.v3.ver, getScale: S.v3.ver, getColor: S.v3.ver } }));
+    L.push(new deck.PathLayer({ id: "jumps-sel", data: S.lnB, _pathType: "open", getColor: [230, 70, 10, 255], getWidth: 3, widthUnits: "pixels", getDashArray: [3, 1.6], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
   }
-  const L = [new deck.ScatterplotLayer({ id: "crowns", data: { length: N + NA, attributes: { getPosition: { value: S.pos, size: 2 }, getRadius: { value: S.rad, size: 1 }, getFillColor: { value: col, size: 4 } } },
-    radiusUnits: "meters", radiusMinPixels: 0.7, pickable: true, autoHighlight: true, highlightColor: [226, 0, 122, 255], updateTriggers: { getFillColor: S.ver, getRadius: S.ver } })];
   if (S.crit) L.push(new deck.ScatterplotLayer({ id: "crit", data: S.crit, getPosition: d => [d.lon, d.lat], getRadius: 18, radiusUnits: "meters", radiusMinPixels: 6,
-    filled: false, stroked: true, getLineColor: [226, 0, 122, 220], lineWidthMinPixels: 2, pickable: true }));
+    filled: false, stroked: true, getLineColor: [226, 0, 122, 200], lineWidthMinPixels: 2, pickable: true }));
+  if (S.ext && S.showExt) {                             // suggested trees that would lengthen the route: pink, pulsing
+    const ph = S.manual ? (S.pulse || 0) : performance.now() / 600;
+    L.push(new deck.ScatterplotLayer({ id: "ext-ring", data: S.ext, getPosition: d => [d.lon, d.lat, 0.5], getRadius: 9 + 3 * Math.sin(ph), radiusUnits: "meters", radiusMinPixels: 7 + 2 * Math.sin(ph),
+      filled: true, getFillColor: [226, 0, 122, 60], stroked: true, getLineColor: [226, 0, 122, 255], lineWidthMinPixels: 2.5, pickable: true, updateTriggers: { getRadius: ph } }));
+    L.push(new deck.TextLayer({ id: "ext-lbl", data: S.extLbl || (S.extLbl = S.ext.reduce((L, d, i) => { const l = L[L.length - 1]; if (l && Math.hypot((d.lon - l.lon) * KX, (d.lat - l.lat) * KY) < 30) l.t = "+" + l.a + "–" + (i + 1); else L.push({ lon: d.lon, lat: d.lat, a: i + 1, t: "+" + (i + 1) }); return L; }, [])),
+      getPosition: d => [d.lon, d.lat, 12], getText: d => d.t, getSize: 15, getColor: [226, 0, 122, 255],
+      fontWeight: 800, fontFamily: "Inter, sans-serif", outlineWidth: 4, outlineColor: [255, 255, 255, 255], fontSettings: { sdf: true }, getPixelOffset: [0, -16] }));
+  }
   if (S.anim) {
-    const { path, k } = S.anim, upto = Math.floor(k), f = k - upto;
-    const head = upto + 1 < path.length ? [path[upto][0] + (path[upto + 1][0] - path[upto][0]) * f, path[upto][1] + (path[upto + 1][1] - path[upto][1]) * f] : path[path.length - 1];
-    const trail = path.slice(0, upto + 1).concat([head]);
-    L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [60, 40, 140, 235], widthMinPixels: 3, getWidth: 3, widthUnits: "pixels", jointRounded: true, capRounded: true }));
-    L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 14, radiusUnits: "pixels", getFillColor: [255, 176, 0, 90] }));
-    L.push(new deck.IconLayer({ id: "sq", data: [{ p: head, a: S.anim.dir || 0 }], getPosition: d => d.p, getIcon: () => ({ url: SQ, width: 128, height: 128, anchorY: 96 }),
+    const { path, k } = S.anim, upto = Math.floor(k), f = k - upto, zz = S.z3 ? 10 : 0;
+    const P = path.map(p => [p[0], p[1], zz]);
+    const head = upto + 1 < P.length ? [P[upto][0] + (P[upto + 1][0] - P[upto][0]) * f, P[upto][1] + (P[upto + 1][1] - P[upto][1]) * f, zz] : P[P.length - 1];
+    const trail = P.slice(0, upto + 1).concat([head]);
+    L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [60, 40, 140, 240], getWidth: 4, widthUnits: "pixels", jointRounded: true, capRounded: true }));
+    L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 16, radiusUnits: "pixels", getFillColor: [255, 176, 0, 90] }));
+    L.push(new deck.IconLayer({ id: "sq", data: [{ p: head }], getPosition: d => d.p, getIcon: () => ({ url: SQ, width: 128, height: 128, anchorY: 96 }),
       getSize: 58, sizeUnits: "pixels", billboard: true }));
   }
   return L;
 }
-function redraw() { S.ver++; overlay.setProps({ layers: deckLayers() }); }
+function redraw() { S.ver++; S.colDirty = true; if (overlay) overlay.setProps({ layers: deckLayers() }); }
+function frame() { if (overlay) overlay.setProps({ layers: deckLayers() }); }   // camera / animation only: no recolouring
 
 // ── panel ──
 function kpis() {
@@ -213,34 +287,42 @@ function log(html) { $("#log").innerHTML = html + ` <a href="#" id="reset" style
 function route() {
   if (S.sel < 0) { const R = S.A.route; play(R.coords, R); return; }
   const ro = S.root[S.sel], N = S.N, NP = S.NP, nodes = [];
-  const pos = n => n < N ? [S.lon[n], S.lat[n]] : n < N + NP ? null : [S.added[n - N - NP].lon, S.added[n - N - NP].lat];
+  const pos = n => n < N ? [S.lon[n], S.lat[n]] : n < N + NP ? S.A.park_pts[n - N] : [S.added[n - N - NP].lon, S.added[n - N - NP].lat];   // parks: safe islands, crossed via an inner point
   const adj = new Map(), add = (a, b) => { (adj.get(a) || adj.set(a, []).get(a)).push(b); };
   const ok = (g, f) => g <= S.jump && !(S.roads && (f & 1));
-  for (let i = 0; i < S.M; i++) { const a = S.ea[i], b = S.eb[i]; if (a < N && b < N && S.root[a] === ro && ok(S.eg[i], S.ef[i]) && !S.removed[a] && !S.removed[b]) { add(a, b); add(b, a); } }
-  S.added.forEach((t, k) => { const n = N + NP + k; if (S.root[n] !== ro || t.gone) return; for (const l of t.links) if (l.b < N || l.b >= N + NP) if (ok(l.g, l.f)) { add(n, l.b); add(l.b, n); } });
+  for (let i = 0; i < S.M; i++) { const a = S.ea[i], b = S.eb[i]; if (S.root[a] === ro && ok(S.eg[i], S.ef[i]) && !S.removed[a] && !S.removed[b] && pos(a) && pos(b)) { add(a, b); add(b, a); } }
+  S.added.forEach((t, k) => { const n = N + NP + k; if (S.root[n] !== ro || t.gone) return; for (const l of t.links) if (ok(l.g, l.f) && !(l.b >= N + NP && S.added[l.b - N - NP].gone)) { add(n, l.b); add(l.b, n); } });
   if (!adj.size) { $("#hint").textContent = "This tree has no neighbour in reach: it stands alone in the lava."; return; }
-  const far = src => { const dist = new Map([[src, 0]]), prev = new Map(), q = [src]; let best = src;
-    while (q.length) { const u = q.shift(); for (const v of adj.get(u) || []) if (!dist.has(v)) { const [ux, uy] = pos(u), [vx, vy] = pos(v); dist.set(v, dist.get(u) + Math.hypot((vx - ux) * KX, (vy - uy) * KY)); prev.set(v, u); q.push(v); if (dist.get(v) > dist.get(best)) best = v; } }
+  const far = src => {                                  // Dijkstra (binary heap) over the crown links
+    const dist = new Map([[src, 0]]), prev = new Map(), H = [[0, src]], done = new Set(); let best = src;
+    const push = e => { H.push(e); let i = H.length - 1; while (i) { const p = (i - 1) >> 1; if (H[p][0] <= H[i][0]) break; [H[p], H[i]] = [H[i], H[p]]; i = p; } };
+    const pop = () => { const t = H[0], l = H.pop(); if (H.length) { H[0] = l; let i = 0; for (;;) { const a = 2 * i + 1, b = a + 1; let m = i; if (a < H.length && H[a][0] < H[m][0]) m = a; if (b < H.length && H[b][0] < H[m][0]) m = b; if (m === i) break; [H[m], H[i]] = [H[i], H[m]]; i = m; } } return t; };
+    while (H.length) { const [du, u] = pop(); if (done.has(u)) continue; done.add(u); if (du > dist.get(best) && (u < N || u >= N + NP)) best = u;
+      const [ux, uy] = pos(u); for (const v of adj.get(u) || []) { const [vx, vy] = pos(v), nd = du + Math.hypot((vx - ux) * KX, (vy - uy) * KY) + 0.1; if (!dist.has(v) || nd < dist.get(v)) { dist.set(v, nd); prev.set(v, u); push([nd, v]); } } }
     return { best, prev, dist }; };
-  const start = S.sel < N || S.sel >= N + NP ? S.sel : adj.keys().next().value;
+  let start = -1; for (const n of adj.keys()) if (n < N && (start < 0 || n < start)) start = n;   // same start as the analysis: lowest tree id
+  if (start < 0) start = adj.keys().next().value;
   const a = far(start).best, { best: b, prev, dist } = far(a);
   const path = [b]; while (path[path.length - 1] !== a) path.push(prev.get(path[path.length - 1]));
-  play(path.reverse().map(pos), { km: dist.get(b) / 1000, trees: path.length });
+  const info = { km: dist.get(b) / 1000, trees: path.filter(n => n < N || n >= N + NP).length };
+  S.lastRoute = info; play(path.reverse().map(pos), info);
+  return info;
 }
 function play(coords, info) {
+  S.lastPath = coords;
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; coords.forEach(([x, y]) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); });
   map.fitBounds([[x0, y0], [x1, y1]], { padding: 90, pitch: 50, duration: 1500, maxZoom: 17.5 });
   $("#hint").innerHTML = `🐿️ ${info.km.toFixed(2)} km over ${fmt(info.trees)} crowns without touching the ground${info.streets ? ` (${info.area}: ${info.streets.join(" → ")})` : ""}.`;
   const t0 = performance.now() + 1500, dur = Math.max(5000, coords.length * 90);
-  const step = now => { const k = Math.max(0, Math.min(1, (now - t0) / dur)); S.anim = { path: coords, k: k * (coords.length - 1) }; overlay.setProps({ layers: deckLayers() }); if (k < 1 && !S.manual) requestAnimationFrame(step); };
+  const step = now => { const k = Math.max(0, Math.min(1, (now - t0) / dur)); S.anim = { path: coords, k: k * (coords.length - 1) }; frame(); if (k < 1 && !S.manual) requestAnimationFrame(step); };
   if (!S.manual) requestAnimationFrame(step);
 }
 
 function onClick(e) {
-  const pick = overlay.pickObject({ x: e.point.x, y: e.point.y, radius: 4, layerIds: ["crowns", "crit"] });
+  const pick = overlay.pickObject({ x: e.point.x, y: e.point.y, radius: 4, layerIds: ["crowns", "crowns3d", "crit", "ext-ring"] });
   if (S.tool === "plant") { plant(e.lngLat.lng, e.lngLat.lat); return; }
-  if (pick && pick.layer.id === "crit") { plant(pick.object.lon, pick.object.lat); return; }
-  if (pick && pick.layer.id === "crowns") { const i = pick.index, node = i < S.N ? i : i - S.N + S.N + S.NP; if (S.tool === "axe") chop(node); else select(node); return; }
+  if (pick && (pick.layer.id === "crit" || pick.layer.id === "ext-ring")) { plant(pick.object.lon, pick.object.lat); return; }
+  if (pick && (pick.layer.id === "crowns" || pick.layer.id === "crowns3d")) { const i = pick.layer.id === "crowns3d" ? S.v3.idx[pick.index] : pick.index, node = i < S.N ? i : i - S.N + S.N + S.NP; if (S.tool === "axe") chop(node); else select(node); return; }
   const f = map.queryRenderedFeatures(e.point, { layers: ["parks"] })[0];
   if (f) { select(S.N + f.properties.id); return; }
   select(-1);
@@ -272,5 +354,27 @@ async function main() {
   document.querySelectorAll("#crit li").forEach(li => li.onclick = () => { const c = S.crit[+li.dataset.i]; if (S.jump < 2) setJump(2);
     map.flyTo({ center: [c.lon, c.lat], zoom: 17, pitch: 45, duration: 1600 }); setTimeout(() => plant(c.lon, c.lat), 1700); });
   curve();
+  // route extension: the suggested trees, and a button that plants them and runs the squirrel again
+  S.ext = (S.A.extend && S.A.extend.trees) || []; S.showExt = S.ext.length > 0;
+  if (S.ext.length) { $("#t-ext").textContent = `🌱 Plant ${S.ext.length} trees to extend the longest route`; $("#t-ext").onclick = () => extendRoute(); } else $("#t-ext").style.display = "none";
+  map.on("move", () => { if (S.ready) frame(); });
+  const pulse = () => { if (S.ready && S.showExt && !S.manual && !S.anim) frame(); setTimeout(() => requestAnimationFrame(pulse), 60); }; pulse();
+  $("#bop").oninput = e => { S.bOp = +e.target.value; if (map.getLayer("buildings")) map.setPaintProperty("buildings", "fill-extrusion-opacity", S.bOp); $("#bopv").textContent = Math.round(S.bOp * 100) + "%"; };
+}
+// plant the suggested trees next to the largest group, then show how much longer the squirrel's route gets
+function routeNode() { const [x, y] = S.A.route.coords[0]; let best = 0, bd = 1e9; for (let i = 0; i < S.N; i++) { const d = (S.lon[i] - x) ** 2 + (S.lat[i] - y) ** 2; if (d < bd) { bd = d; best = i; } } return best; }
+function extendRoute(opts = {}) {
+  if (S.jump !== 2) setJump(2);
+  S.added = []; S.pos = null; refresh(false);
+  const rn = S.routeNode ?? (S.routeNode = routeNode());
+  select(rn); const quiet = () => { const m = S.manual; S.manual = true; const r = route(); S.manual = m; return r; };
+  const before = quiet();
+  const sz0 = S.size[S.root[rn]];
+  for (const t of S.ext) plant(t.lon, t.lat);
+  select(rn); S.anim = null;
+  const after = opts.noPlay ? quiet() : route();
+  const msg = `🌱 ${S.ext.length} new trees: the group grows from ${fmt(sz0)} to <b>${fmt(S.size[S.root[rn]])} trees</b>, and the longest route from ${before.km.toFixed(2)} to <b>${after.km.toFixed(2)} km</b>.`;
+  log(msg); S.extResult = { before: before.km, after: after.km, sz0, sz1: S.size[S.root[rn]], n: S.ext.length };
+  return S.extResult;
 }
 main();

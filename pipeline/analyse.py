@@ -125,5 +125,58 @@ out["route"] = {"km": round(float(d1[p2]) / 1000, 2), "trees": len(tr), "parks":
                 "group_trees": int(len(tnodes)), "group_parks": int(len(parks_in)),
                 "coords": [[round(float(lon[n]), 6), round(float(lat[n]), 6)] for n in path]}
 print({k: v for k, v in out["route"].items() if k != "coords"})
+
+# route extension: up to 5 new trees (8 m crown) that make the longest canopy path in the largest group longest, chosen greedily.
+# Each new tree links one tree of the current group with one tree outside it (both gaps ≤ 2 m, no major-road crossing).
+def diameter(nodes_, Gs):
+    sub = Gs[nodes_][:, nodes_]
+    tn = np.flatnonzero(nodes_ < N) if True else None
+    d0_ = dijkstra(sub, directed=False, indices=0)
+    a_ = int(np.argmax(np.where(np.isfinite(d0_), d0_, -1)))
+    d1_ = dijkstra(sub, directed=False, indices=a_)
+    return float(np.max(np.where(np.isfinite(d1_), d1_, -1)))
+
+Gx = G.tolil()
+cur = set(nodes.tolist())
+labs = lab.copy()
+ext, used, BUDGET = [], 0, 5
+base_km = out["route"]["km"]; now_km = base_km
+reach_ = r.max() + 2 * (2 * NEW_R + 2) + 2 + 10
+while used < BUDGET:
+    members = np.array(sorted(n for n in cur if n < N))
+    best, seenc = None, set()
+    for i in members:
+        for j in kd.query_ball_point([X[i], Y[i]], r[i] + reach_):
+            if j in cur or j >= N: continue
+            dd = float(np.hypot(X[i] - X[j], Y[i] - Y[j])); g_ = dd - r[i] - r[j]
+            k = 1 if g_ <= 2 * NEW_R + 4 else 2 if g_ <= 4 * NEW_R + 6 else 0      # 1 tree spans ≤ 12 m, 2 trees ≤ 22 m
+            if k == 0 or used + k > BUDGET: continue
+            cj = labs[j]
+            if (i, cj, k) in seenc: continue
+            if len(rtree.query(LineString([(lon[i], lat[i]), (lon[j], lat[j])]), predicate="intersects")): continue
+            seenc.add((i, cj, k))
+            # k new crowns evenly spread in the gap
+            gs = max(g_ - 2 * NEW_R * k, 0) / (k + 1)                              # equal gaps between all crowns in the chain
+            ts = [(r[i] + gs + NEW_R + q * (2 * NEW_R + gs)) / dd for q in range(k)]
+            pts = [(X[i] + (X[j] - X[i]) * t, Y[i] + (Y[j] - Y[i]) * t, t) for t in ts]
+            H = Gx.copy(); n0 = H.shape[0]; H.resize((n0 + k, n0 + k))
+            chain = [i] + list(range(n0, n0 + k)) + [j]
+            xy = [(X[i], Y[i])] + [(x, y) for x, y, _ in pts] + [(X[j], Y[j])]
+            for u in range(len(chain) - 1):
+                H[chain[u], chain[u + 1]] = H[chain[u + 1], chain[u]] = float(np.hypot(xy[u][0] - xy[u + 1][0], xy[u][1] - xy[u + 1][1])) + 0.1
+            comp_j = np.flatnonzero(labs == cj)
+            idx = np.array(sorted(cur | set(comp_j.tolist()) | set(range(n0, n0 + k))))
+            km = diameter(idx, H.tocsr()) / 1000
+            score = (km - now_km) / k
+            if best is None or score > best[0]: best = (score, km, k, i, j, pts, cj, H, comp_j, n0)
+    if best is None or best[1] - now_km < 0.005: break
+    score, km, k, i, j, pts, cj, H, comp_j, n0 = best
+    Gx = H; labs = np.r_[labs, [labs[i]] * k]; labs[comp_j] = labs[i]
+    cur |= set(comp_j.tolist()) | set(range(n0, n0 + k)); used += k; now_km = km
+    for x_, y_, t in pts:
+        ext.append({"lon": round(float(lon[i] + (lon[j] - lon[i]) * t), 7), "lat": round(float(lat[i] + (lat[j] - lat[i]) * t), 7), "km": round(km, 2), "joins": int(len(comp_j))})
+    print("extend +", k, "tree(s) →", round(km, 2), "km, joins", len(comp_j))
+out["extend"] = {"base_km": base_km, "trees": ext}
 out["largest_group_parks"] = P.name[(parks_in - N)].value_counts().head(12).index.tolist() if len(parks_in) else []
+out["park_pts"] = [[round(float(a_), 5), round(float(b_), 5)] if np.isfinite(a_) else None for a_, b_ in zip(lon[N:], lat[N:])]
 (W / "analysis.json").write_text(json.dumps(out, ensure_ascii=False))
