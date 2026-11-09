@@ -57,7 +57,7 @@ const CSS = `
   .v .q { font-size: 29px; color: #4a423c; line-height: 1.3; max-width: 900px; }
   .v.bot { bottom: 50px; }
   .v .big { font-family: "Bricolage Grotesque", Inter; font-size: 50px; font-weight: 800; line-height: 1.04; letter-spacing: -.02em; }
-  .v .big b { color: #168044; } .v .big em { font-style: normal; color: #e04a12; }
+  .v .big b { color: #15803d; } .v .big em { font-style: normal; color: #ea580c; }
   .v .sm { font-size: 24px; color: #4a423c; line-height: 1.35; margin-top: 12px; }
   .v .chips { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 19px; color: #4a423c; margin-top: 16px; }
   .v .chips i { display: inline-block; width: 15px; height: 15px; border-radius: 50%; margin-right: 7px; vertical-align: -2px; }
@@ -68,9 +68,10 @@ const CSS = `
   .card2 li { font-size: 26px; line-height: 1.38; color: #4a423c; margin: 0 0 12px; } .card2 b { color: #1f1a17; }
   .card2 .url { margin-top: 20px; font-size: 25px; font-weight: 700; color: #168044; } .card2 .att { margin-top: 8px; font-size: 15px; color: #8a8079; }
 `;
-const CHIPS = `<div class="chips"><span><i style="background:#ffb000"></i>reachable</span><span><i style="background:#168044"></i>group 50+</span>
-  <span><i style="background:#40a860"></i>10–49</span><span><i style="background:#8cc88c"></i>2–9</span><span><i style="background:#c4bcb4"></i>alone</span>
-  <span><i style="background:#d5ead2;border:1px solid #a8cfa4"></i>park · cemetery · allotment</span><span><i style="width:22px;height:0;border-radius:0;border-top:3px dashed #ff5a1f"></i>squirrel jump</span><span><i style="width:22px;height:6px;border-radius:3px;background:#c3bdb6"></i>major road</span><span><i style="background:#e2007a"></i>new tree</span></div>`;
+const CHIPS = `<div class="chips"><span><i style="background:#ea580c"></i>connected</span><span><i style="background:#f97316"></i>10–49</span><span><i style="background:#fdaa64"></i>2–9</span>
+  <span><i style="background:#aad6e8"></i>alone</span><span><i style="background:#16a34a"></i>reachable</span><span><i style="background:#e2007a"></i>new tree</span>
+  <span><i style="width:22px;height:0;border-radius:0;border-top:3px dashed #7c2d12"></i>squirrel jump</span><span><i style="width:22px;height:6px;border-radius:3px;background:#c3bdb6"></i>major road</span>
+  <span><i style="background:#e4ece0;border:1px solid #bcd4b6"></i>park · cemetery · allotment</span></div>`;
 const ATT = `<div class="att">Straßenbaumkataster & Digitaler Grünplan © FHH/BUKEA (dl-de/by-2-0) · roads & buildings © OpenStreetMap (ODbL) · OpenFreeMap · © CARTO</div>`;
 
 async function open() {

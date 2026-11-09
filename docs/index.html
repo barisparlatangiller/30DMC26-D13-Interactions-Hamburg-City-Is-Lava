@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
-<link href="style.css?v=3" rel="stylesheet">
+<link href="style.css?v=4" rel="stylesheet">
 </head>
 <body>
 <div id="map"></div>
@@ -54,7 +54,7 @@
       are skipped).</p>
     <p><b>Extending the route.</b> The pink rings are up to 5 new trees (8 m crowns) chosen one by one so that the longest canopy path in the largest
       Squirrel-Mode group grows the most; each joins the group to a tree outside it with gaps of 2 m or less, never across a major road.</p>
-    <p><b>Limits.</b> Crowns are circles from the register's crown diameter; in 3D their height (trunk 2.5 m, crown about 1.15 × radius) is a sketch,
+    <p><b>Limits.</b> Crowns are circles from the register's crown diameter; in 3D the crown shape follows the genus (tall oval for limes and hornbeams, broad dome for oaks, planes and chestnuts, narrow column for poplars and birches, cone for conifers, small round for fruit trees), and the heights are a sketch,
       not data. Buildings are OpenStreetMap heights. A dashed line is a possible jump, not an observed squirrel.</p>
     <p class="fine">Data: Straßenbaumkataster and Digitaler Grünplan © Freie und Hansestadt Hamburg, BUKEA (dl-de/by-2-0) · roads and buildings © OpenStreetMap
       contributors (ODbL), buildings via OpenFreeMap · basemap © CARTO. Barış Parlatangiller, built with Claude ·
@@ -64,14 +64,14 @@
 </aside>
 
 <div class="legend" id="legend">
-  <span><i style="background:#ffb000"></i>reachable</span><span><i style="background:#168044"></i>group 50+</span><span><i style="background:#40a860"></i>group 10–49</span>
-  <span><i style="background:#8cc88c"></i>group 2–9</span><span><i style="background:#c4bcb4"></i>alone</span><span><i style="background:#d5ead2;border:1px solid #a8cfa4"></i>safe island</span><span><i style="background:#e2007a"></i>new tree</span>
-  <span><i style="width:18px;height:0;border-radius:0;border-top:2px dashed #ff5a1f"></i>squirrel jump</span>
-  <span><i style="width:18px;height:5px;border-radius:2px;background:#c3bdb6"></i>major road</span><span><i style="background:#fff;border:2px solid #e2007a"></i>tree that extends the route</span>
+  <span><i style="background:#ea580c"></i>connected (group 50+)</span><span><i style="background:#f97316"></i>10–49</span><span><i style="background:#fdaa64"></i>2–9</span>
+  <span><i style="background:#aad6e8"></i>alone (no jump possible)</span><span><i style="background:#16a34a"></i>reachable from your tap</span><span><i style="background:#e2007a"></i>new tree</span>
+  <span><i style="width:18px;height:0;border-radius:0;border-top:2px dashed #7c2d12"></i>squirrel jump</span><span><i style="width:18px;height:5px;border-radius:2px;background:#c3bdb6"></i>major road</span>
+  <span><i style="background:#e4ece0;border:1px solid #bcd4b6"></i>safe island</span><span><i style="background:#fff;border:2px solid #e2007a"></i>tree that extends the route</span>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/deck.gl@9.0.38/dist.min.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

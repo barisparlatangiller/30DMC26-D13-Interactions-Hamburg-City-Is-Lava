@@ -4,7 +4,7 @@
 const $ = s => document.querySelector(s);
 const fmt = n => Math.round(n).toLocaleString("en-GB");
 const KX = 111320 * Math.cos(53.55 * Math.PI / 180), KY = 111320;
-const C = { reach: [255, 176, 0], g50: [22, 128, 68], g10: [64, 168, 96], g2: [140, 200, 140], alone: [196, 188, 180], newt: [226, 0, 122] };
+const C = { reach: [22, 163, 74], g50: [234, 88, 12], g10: [249, 115, 22], g2: [253, 170, 100], alone: [170, 214, 232], newt: [226, 0, 122] };   // connected: orange · alone: ice blue · reachable: green
 const SQ = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
 <defs><filter id="g" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feFlood flood-color="#ffd27a" flood-opacity=".8"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
 <g filter="url(#g)" fill="#ff9f43" stroke="#3a1a08" stroke-width="2.5" stroke-linejoin="round">
@@ -22,8 +22,9 @@ window.S = S;
 
 async function load() {
   const bin = u => fetch(u).then(r => r.arrayBuffer()), j = u => fetch(u).then(r => r.json());
-  const [tb, eb, parks, roads, A, meta] = await Promise.all([bin("data/trees.bin?v=1"), bin("data/edges.bin?v=1"), j("data/parks.geojson?v=1"),
-    j("data/roads_major.geojson?v=1"), j("data/analysis.json?v=2"), j("data/meta.json?v=1")]);
+  const [tb, eb, parks, roads, A, meta, gb, gj] = await Promise.all([bin("data/trees.bin?v=1"), bin("data/edges.bin?v=1"), j("data/parks.geojson?v=1"),
+    j("data/roads_major.geojson?v=1"), j("data/analysis.json?v=2"), j("data/meta.json?v=1"), bin("data/genus.bin?v=1"), j("data/genus.json?v=1")]);
+  S.genus = new Uint8Array(gb); S.gnames = gj.names; S.gshape = gj.shape;
   const tv = new DataView(tb), N = tb.byteLength / 10;
   S.N = N; S.lon = new Float64Array(N); S.lat = new Float64Array(N); S.r = new Float32Array(N);
   for (let i = 0; i < N; i++) { S.lon[i] = tv.getFloat32(i * 10, true); S.lat[i] = tv.getFloat32(i * 10 + 4, true); S.r[i] = tv.getUint16(i * 10 + 8, true) / 10; }
@@ -83,7 +84,12 @@ function initMap() {
     center: [9.99, 53.565], zoom: 11.2, pitch: 0, maxPitch: 70, attributionControl: false });
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
   map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "Bäume & Grünplan © FHH/BUKEA (dl-de/by-2-0) · roads © OSM (ODbL) · © CARTO" }), "bottom-right");
-  overlay = new deck.MapboxOverlay({ interleaved: false, layers: [], getCursor: ({ isHovering }) => S.tool ? "crosshair" : isHovering ? "pointer" : "grab" });
+  overlay = new deck.MapboxOverlay({ interleaved: false, layers: [],
+    getTooltip: ({ layer, index }) => { if (!layer || !["crowns", "crowns3d", "cones"].includes(layer.id) || index < 0) return null;
+      const i = layer.id === "crowns3d" ? S.v3.idx[index] : layer.id === "cones" ? S.v3.cones.idx[index] : index, N = S.N;
+      if (i >= N) return { text: "Your new tree · 8 m crown" };
+      const sz = S.size[S.root[i]]; return { text: `${S.gnames[S.genus[i]]} · crown ${(2 * S.r[i]).toFixed(0)} m\n${sz > 1 ? `group of ${fmt(sz)} trees` : "alone in the lava"}`,
+        style: { background: "#fff", color: "#1f1a17", fontSize: "12px", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,.15)", padding: "6px 9px" } }; }, getCursor: ({ isHovering }) => S.tool ? "crosshair" : isHovering ? "pointer" : "grab" });
   map.addControl(overlay);
 }
 function styleBase() {
@@ -103,8 +109,8 @@ function addLayers() {
   try {
     styleBase();
     map.addSource("parks", { type: "geojson", data: S.parks, promoteId: "id" });
-    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#fff0c4", "#d5ead2"], "fill-opacity": 0.85 } });
-    map.addLayer({ id: "parks-l", type: "line", source: "parks", paint: { "line-color": ["case", ["boolean", ["feature-state", "reach"], false], "#f0a500", "#a8cfa4"], "line-width": 0.8 } });
+    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#cdeccf", "#e4ece0"], "fill-opacity": 0.85 } });
+    map.addLayer({ id: "parks-l", type: "line", source: "parks", paint: { "line-color": ["case", ["boolean", ["feature-state", "reach"], false], "#16a34a", "#bcd4b6"], "line-width": 0.8 } });
     // major roads in grey, drawn at roughly their real width (metres by class)
     map.addSource("roads", { type: "geojson", data: S.roadsGeo });
     const wm = ["match", ["get", "fclass"], "motorway", 26, "trunk", 20, "primary", 16, "secondary", 12, 7];
@@ -123,12 +129,30 @@ function addLayers() {
   } catch (e) { console.warn(e); return false; }
 }
 const Z3 = 14;                                         // from this zoom on, crowns are drawn in 3D
-const crownH = r => Math.max(3, r * 1.15), BASE = 2.5;  // crown thickness and trunk height (m): a sketch, the register has no heights
-const topZ = r => BASE + crownH(r);
+const crownH = r => Math.max(3, r * 1.15), BASE = 3;  // crown thickness and trunk height (m): a sketch, the register has no heights
+// crown shape by genus: 0 round · 1 tall oval (lime, hornbeam) · 2 broad dome (oak, plane, chestnut) · 3 narrow column (poplar, birch, ginkgo) · 4 cone (conifers) · 5 small round (fruit trees, rowan)
+function shape(i) {                                     // i: drawn-tree index → crown centre z, scales, trunk height, top z, cone?
+  const N = S.N, r = i < N ? S.r[i] : S.added[i - N].r, h = crownH(r), k = i < N ? S.gshape[S.genus[i]] : 0;
+  if (k === 1) return { cz: BASE + 0.8 * h, sx: 0.85 * r, sz: 0.8 * h, trunk: BASE + 0.5 * h, top: BASE + 1.6 * h };
+  if (k === 2) return { cz: BASE + 0.45 * h, sx: 1.05 * r, sz: 0.45 * h, trunk: BASE + 0.3 * h, top: BASE + 0.9 * h };
+  if (k === 3) return { cz: 0.7 * BASE + 1.1 * h, sx: 0.5 * r, sz: 1.1 * h, trunk: BASE + 0.6 * h, top: 0.7 * BASE + 2.2 * h };
+  if (k === 4) return { cz: 0.5 * BASE, sx: 0.9 * r, sz: 2.4 * h, trunk: 0.5 * BASE + 0.4 * h, top: 0.5 * BASE + 2.4 * h, cone: true };
+  if (k === 5) return { cz: 1.8 + 0.5 * h, sx: r, sz: 0.5 * h, trunk: 1.8 + 0.3 * h, top: 1.8 + h };
+  return { cz: BASE + 0.5 * h, sx: r, sz: 0.5 * h, trunk: BASE + 0.35 * h, top: BASE + h };
+}
+const drawIdx = n => n < S.N ? n : n - S.NP;            // node id → drawn-tree index
+const CONE = (() => { const P = [], Nn = [], I = [], SEG = 12;            // unit cone: base radius 1 at z 0, tip at z 1
+  for (let o = 0; o <= SEG; o++) { const f = 2 * Math.PI * o / SEG, x = Math.cos(f), y = Math.sin(f); P.push(x, y, 0, 0, 0, 1); Nn.push(x * 0.7, y * 0.7, 0.7, x * 0.7, y * 0.7, 0.7); }
+  for (let o = 0; o < SEG; o++) { const a = 2 * o; I.push(a, a + 2, a + 1); }
+  return { attributes: { positions: { value: new Float32Array(P), size: 3 }, normals: { value: new Float32Array(Nn), size: 3 } }, indices: { value: new Uint16Array(I), size: 1 } }; })();
 // low-poly crown: a squashed sphere, unit radius, centred
 const MESH = (() => { const P = [], Nn = [], I = [], LA = 6, LO = 12;
   for (let a = 0; a <= LA; a++) { const t = Math.PI * a / LA; for (let o = 0; o <= LO; o++) { const f = 2 * Math.PI * o / LO, x = Math.sin(t) * Math.cos(f), y = Math.sin(t) * Math.sin(f), z = Math.cos(t); P.push(x, y, z); Nn.push(x, y, z); } }
   for (let a = 0; a < LA; a++) for (let o = 0; o < LO; o++) { const p = a * (LO + 1) + o, q = p + LO + 1; I.push(p, q, p + 1, q, q + 1, p + 1); }
+  return { attributes: { positions: { value: new Float32Array(P), size: 3 }, normals: { value: new Float32Array(Nn), size: 3 } }, indices: { value: new Uint16Array(I), size: 1 } }; })();
+const TRUNK = (() => { const P = [], Nn = [], I = [], SEG = 8;            // unit cylinder z 0..1
+  for (let o = 0; o <= SEG; o++) { const f = 2 * Math.PI * o / SEG, x = Math.cos(f), y = Math.sin(f); P.push(x, y, 0, x, y, 1); Nn.push(x, y, 0, x, y, 0); }
+  for (let o = 0; o < SEG; o++) { const a = 2 * o; I.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
   return { attributes: { positions: { value: new Float32Array(P), size: 3 }, normals: { value: new Float32Array(Nn), size: 3 } }, indices: { value: new Uint16Array(I), size: 1 } }; })();
 function nodeXY(n) { const N = S.N, NP = S.NP; return n < N ? [S.lon[n], S.lat[n], S.r[n]] : [S.added[n - N - NP].lon, S.added[n - N - NP].lat, S.added[n - N - NP].r]; }
 function colours() {                                    // one colour per drawn tree (index: trees, then added trees)
@@ -147,17 +171,21 @@ function visible() {                                    // trees in view (3D dra
   const N = S.N, NA = S.added.length, padX = (b.getEast() - b.getWest()) * 0.15, padY = (b.getNorth() - b.getSouth()) * 0.15;
   const w = b.getWest() - padX, e = b.getEast() + padX, so = b.getSouth() - padY, no = b.getNorth() + padY, idx = [];
   for (let i = 0; i < N + NA; i++) { const lo = i < N ? S.lon[i] : S.added[i - N].lon, la = i < N ? S.lat[i] : S.added[i - N].lat; if (lo > w && lo < e && la > so && la < no && S.col[i * 4 + 3]) idx.push(i); }
-  const n = idx.length, pos = new Float32Array(n * 3), sc = new Float32Array(n * 3), col = new Uint8Array(n * 4);
-  idx.forEach((i, k) => { const r = i < N ? S.r[i] : S.added[i - N].r, h = crownH(r);
-    pos[3 * k] = i < N ? S.lon[i] : S.added[i - N].lon; pos[3 * k + 1] = i < N ? S.lat[i] : S.added[i - N].lat; pos[3 * k + 2] = BASE + h / 2;
-    sc[3 * k] = sc[3 * k + 1] = r; sc[3 * k + 2] = h / 2; col.set(S.col.subarray(i * 4, i * 4 + 4), k * 4); });
-  S.v3 = { idx: Int32Array.from(idx), pos, sc, col, n, ver: (S.v3?.ver || 0) + 1 };
+  const mkSet = list => { const n = list.length, pos = new Float32Array(n * 3), sc = new Float32Array(n * 3), col = new Uint8Array(n * 4);
+    list.forEach((i, k) => { const f = shape(i); pos[3 * k] = i < N ? S.lon[i] : S.added[i - N].lon; pos[3 * k + 1] = i < N ? S.lat[i] : S.added[i - N].lat; pos[3 * k + 2] = f.cz;
+      sc[3 * k] = sc[3 * k + 1] = f.sx; sc[3 * k + 2] = f.sz; col.set(S.col.subarray(i * 4, i * 4 + 4), k * 4); });
+    return { idx: Int32Array.from(list), pos, sc, col, n }; };
+  const ell = [], cone = []; idx.forEach(i => (shape(i).cone ? cone : ell).push(i));
+  const n = idx.length, tpos = new Float32Array(n * 3), tsc = new Float32Array(n * 3);     // trunks: from the ground into the crown
+  idx.forEach((i, k) => { const r = i < N ? S.r[i] : S.added[i - N].r; tpos[3 * k] = i < N ? S.lon[i] : S.added[i - N].lon; tpos[3 * k + 1] = i < N ? S.lat[i] : S.added[i - N].lat;
+    tsc[3 * k] = tsc[3 * k + 1] = Math.min(0.55, 0.12 + r * 0.05); tsc[3 * k + 2] = shape(i).trunk; });
+  S.v3 = { ...mkSet(ell), cones: mkSet(cone), n, tpos, tsc, ver: (S.v3?.ver || 0) + 1 };
   // dashed jumps between crowns in view; the selected group's jumps are drawn stronger
   const inV = new Uint8Array(N + NA + S.NP); idx.forEach(i => inV[i < N ? i : i + S.NP] = 1);
   const ro = S.sel >= 0 ? S.root[S.sel] : -1, A = [], B = [];
   for (let k = 0; k < S.la.length; k++) { const a = S.la[k], bb = S.lb[k]; if (inV[a] || inV[bb]) (ro >= 0 && S.root[a] === ro ? B : A).push(a, bb); }
   const mk = L => { const m = L.length / 2, v = new Float32Array(m * 6), st = new Uint32Array(m);
-    for (let k = 0; k < m; k++) { const p = nodeXY(L[2 * k]), q = nodeXY(L[2 * k + 1]); v.set([p[0], p[1], topZ(p[2]) + 1.2, q[0], q[1], topZ(q[2]) + 1.2], 6 * k); st[k] = 2 * k; }
+    for (let k = 0; k < m; k++) { const p = nodeXY(L[2 * k]), q = nodeXY(L[2 * k + 1]); const zp = shape(drawIdx(L[2 * k])).top, zq = shape(drawIdx(L[2 * k + 1])).top; v.set([p[0], p[1], Math.max(zp, zq) + 1, q[0], q[1], Math.max(zp, zq) + 1], 6 * k); st[k] = 2 * k; }
     return { length: m, startIndices: st, attributes: { getPath: { value: v, size: 3 } } }; };
   S.lnA = mk(A); S.lnB = mk(B);
 }
@@ -175,12 +203,18 @@ function deckLayers() {
     radiusUnits: "meters", radiusMinPixels: 0.8, pickable: true, autoHighlight: true, highlightColor: [226, 0, 122, 255], updateTriggers: { getFillColor: S.colVer, getRadius: S.colVer } }));
   else {
     const dash = new deck.PathStyleExtension({ dash: true });
-    L.push(new deck.PathLayer({ id: "jumps", data: S.lnA, _pathType: "open", getColor: [255, 90, 31, 210], getWidth: 2, widthUnits: "pixels", getDashArray: [3, 2], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
+    L.push(new deck.PathLayer({ id: "jumps", data: S.lnA, _pathType: "open", getColor: [124, 45, 18, 230], getWidth: 2, widthUnits: "pixels", getDashArray: [3, 2], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
+    L.push(new deck.SimpleMeshLayer({ id: "cones", data: { length: S.v3.cones.n, attributes: { getPosition: { value: S.v3.cones.pos, size: 3 }, getColor: { value: S.v3.cones.col, size: 4 } } },
+      getScale: (_, { index }) => [S.v3.cones.sc[3 * index], S.v3.cones.sc[3 * index + 1], S.v3.cones.sc[3 * index + 2]], mesh: CONE, getOrientation: [0, 0, 0], pickable: true, autoHighlight: true,
+      highlightColor: [226, 0, 122, 255], material: { ambient: 0.55, diffuse: 0.6 }, updateTriggers: { getPosition: S.v3.ver, getScale: S.v3.ver, getColor: S.v3.ver } }));
+    L.push(new deck.SimpleMeshLayer({ id: "trunks", data: { length: S.v3.n, attributes: { getPosition: { value: S.v3.tpos, size: 3 } } }, mesh: TRUNK, getColor: [120, 92, 70, 255],
+      getOrientation: [0, 0, 0], getScale: (_, { index }) => [S.v3.tsc[3 * index], S.v3.tsc[3 * index + 1], S.v3.tsc[3 * index + 2]], material: { ambient: 0.6, diffuse: 0.5 },
+      updateTriggers: { getScale: S.v3.ver } }));
     L.push(new deck.SimpleMeshLayer({ id: "crowns3d", data: { length: S.v3.n, attributes: { getPosition: { value: S.v3.pos, size: 3 }, getColor: { value: S.v3.col, size: 4 } } },
       getScale: (_, { index }) => [S.v3.sc[3 * index], S.v3.sc[3 * index + 1], S.v3.sc[3 * index + 2]],
       mesh: MESH, getOrientation: [0, 0, 0], pickable: true, autoHighlight: true, highlightColor: [226, 0, 122, 255], material: { ambient: 0.55, diffuse: 0.6, shininess: 12, specularColor: [40, 40, 40] },
       updateTriggers: { getPosition: S.v3.ver, getScale: S.v3.ver, getColor: S.v3.ver } }));
-    L.push(new deck.PathLayer({ id: "jumps-sel", data: S.lnB, _pathType: "open", getColor: [230, 70, 10, 255], getWidth: 3, widthUnits: "pixels", getDashArray: [3, 1.6], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
+    L.push(new deck.PathLayer({ id: "jumps-sel", data: S.lnB, _pathType: "open", getColor: [21, 128, 61, 255], getWidth: 3, widthUnits: "pixels", getDashArray: [3, 1.6], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
   }
   if (S.crit) L.push(new deck.ScatterplotLayer({ id: "crit", data: S.crit, getPosition: d => [d.lon, d.lat], getRadius: 18, radiusUnits: "meters", radiusMinPixels: 6,
     filled: false, stroked: true, getLineColor: [226, 0, 122, 200], lineWidthMinPixels: 2, pickable: true }));
@@ -188,7 +222,7 @@ function deckLayers() {
     const ph = S.manual ? (S.pulse || 0) : performance.now() / 600;
     L.push(new deck.ScatterplotLayer({ id: "ext-ring", data: S.ext, getPosition: d => [d.lon, d.lat, 0.5], getRadius: 9 + 3 * Math.sin(ph), radiusUnits: "meters", radiusMinPixels: 7 + 2 * Math.sin(ph),
       filled: true, getFillColor: [226, 0, 122, 60], stroked: true, getLineColor: [226, 0, 122, 255], lineWidthMinPixels: 2.5, pickable: true, updateTriggers: { getRadius: ph } }));
-    L.push(new deck.TextLayer({ id: "ext-lbl", data: S.extLbl || (S.extLbl = S.ext.reduce((L, d, i) => { const l = L[L.length - 1]; if (l && Math.hypot((d.lon - l.lon) * KX, (d.lat - l.lat) * KY) < 30) l.t = "+" + l.a + "–" + (i + 1); else L.push({ lon: d.lon, lat: d.lat, a: i + 1, t: "+" + (i + 1) }); return L; }, [])),
+    L.push(new deck.TextLayer({ id: "ext-lbl", data: S.extLbl || (S.extLbl = S.ext.reduce((L, d, i) => { const l = L[L.length - 1]; if (l && Math.hypot((d.lon - l.lon) * KX, (d.lat - l.lat) * KY) < 30) l.t = "+" + l.a + "-" + (i + 1); else L.push({ lon: d.lon, lat: d.lat, a: i + 1, t: "+" + (i + 1) }); return L; }, [])),
       getPosition: d => [d.lon, d.lat, 12], getText: d => d.t, getSize: 15, getColor: [226, 0, 122, 255],
       fontWeight: 800, fontFamily: "Inter, sans-serif", outlineWidth: 4, outlineColor: [255, 255, 255, 255], fontSettings: { sdf: true }, getPixelOffset: [0, -16] }));
   }
@@ -198,7 +232,7 @@ function deckLayers() {
     const head = upto + 1 < P.length ? [P[upto][0] + (P[upto + 1][0] - P[upto][0]) * f, P[upto][1] + (P[upto + 1][1] - P[upto][1]) * f, zz] : P[P.length - 1];
     const trail = P.slice(0, upto + 1).concat([head]);
     L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [60, 40, 140, 240], getWidth: 4, widthUnits: "pixels", jointRounded: true, capRounded: true }));
-    L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 16, radiusUnits: "pixels", getFillColor: [255, 176, 0, 90] }));
+    L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 16, radiusUnits: "pixels", getFillColor: [22, 163, 74, 70] }));
     L.push(new deck.IconLayer({ id: "sq", data: [{ p: head }], getPosition: d => d.p, getIcon: () => ({ url: SQ, width: 128, height: 128, anchorY: 96 }),
       getSize: 58, sizeUnits: "pixels", billboard: true }));
   }
@@ -319,10 +353,10 @@ function play(coords, info) {
 }
 
 function onClick(e) {
-  const pick = overlay.pickObject({ x: e.point.x, y: e.point.y, radius: 4, layerIds: ["crowns", "crowns3d", "crit", "ext-ring"] });
+  const pick = overlay.pickObject({ x: e.point.x, y: e.point.y, radius: 4, layerIds: ["crowns", "crowns3d", "cones", "crit", "ext-ring"] });
   if (S.tool === "plant") { plant(e.lngLat.lng, e.lngLat.lat); return; }
   if (pick && (pick.layer.id === "crit" || pick.layer.id === "ext-ring")) { plant(pick.object.lon, pick.object.lat); return; }
-  if (pick && (pick.layer.id === "crowns" || pick.layer.id === "crowns3d")) { const i = pick.layer.id === "crowns3d" ? S.v3.idx[pick.index] : pick.index, node = i < S.N ? i : i - S.N + S.N + S.NP; if (S.tool === "axe") chop(node); else select(node); return; }
+  if (pick && ["crowns", "crowns3d", "cones"].includes(pick.layer.id)) { const i = pick.layer.id === "crowns3d" ? S.v3.idx[pick.index] : pick.layer.id === "cones" ? S.v3.cones.idx[pick.index] : pick.index, node = i < S.N ? i : i - S.N + S.N + S.NP; if (S.tool === "axe") chop(node); else select(node); return; }
   const f = map.queryRenderedFeatures(e.point, { layers: ["parks"] })[0];
   if (f) { select(S.N + f.properties.id); return; }
   select(-1);

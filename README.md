@@ -51,6 +51,7 @@ The map treats every street tree as a crown. Crowns that touch, or are close eno
 ```bash
 python pipeline/build_network.py --data "<folder with the BUKEA JSON files and Hamburg_OSM_Roads.gpkg>"   # → docs/data/*
 python pipeline/analyse.py                                                                               # → docs/data/analysis.json
+python pipeline/genus.py                                                                                 # → docs/data/genus.bin/.json (crown shapes)
 LOCAL=1 node pipeline/video.mjs        # posters + video (normally in GitHub Actions: commit message with [video] / [posters])
 ```
 
@@ -58,7 +59,7 @@ The raw inputs are too large for the repo, so `docs/data` is built locally and c
 
 ## Limits
 
-- Circles are not real branches. In 3D, crown height (2.5 m trunk, crown about 1.15 × radius) is a sketch, not data. Crown shape is unknown, and so is whether two crowns above a road actually meet.
+- Circles are not real branches. In 3D, the crown shape follows the genus (tall oval: lime, hornbeam · broad dome: oak, plane, chestnut · column: poplar, birch, ginkgo · cone: conifers · small round: fruit trees, rowan); heights are a sketch, not data. Crown shape is unknown, and so is whether two crowns above a road actually meet.
 - The 2 m jump is a starting assumption to compare against, not a measured squirrel jump.
 - Trees inside parks and on private land are not in the register. That is why parks count as whole islands, and why private gardens, which squirrels love, are missing.
 - A link is a possible path, not an observed squirrel.
