@@ -22,10 +22,13 @@ window.S = S;
 
 async function load() {
   const bin = u => fetch(u).then(r => r.arrayBuffer()), j = u => fetch(u).then(r => r.json());
-  const [tb, eb, parks, roads, A, meta, gb, gj] = await Promise.all([bin("data/trees.bin?v=1"), bin("data/edges.bin?v=1"), j("data/parks.geojson?v=1"),
-    j("data/roads_major.geojson?v=1"), j("data/analysis.json?v=2"), j("data/meta.json?v=1"), bin("data/genus.bin?v=1"), j("data/genus.json?v=1")]);
+  const [tb, eb, parks, roads, A, meta, gb, gj, db, dj] = await Promise.all([bin("data/trees.bin?v=1"), bin("data/edges.bin?v=1"), j("data/parks.geojson?v=1"),
+    j("data/roads_major.geojson?v=1"), j("data/analysis.json?v=2"), j("data/meta.json?v=1"), bin("data/genus.bin?v=1"), j("data/genus.json?v=1"), bin("data/details.bin?v=1"), j("data/details.json?v=1")]);
   S.genus = new Uint8Array(gb); S.gnames = gj.names; S.gshape = gj.shape;
-  const tv = new DataView(tb), N = tb.byteLength / 10;
+  // register details: trunk circumference (cm), planting year, species, cultivar form (columnar / globe / weeping)
+  const N = tb.byteLength / 10, dv = new DataView(db); S.trunk = new Uint16Array(N); S.year = new Uint16Array(N); S.sp = new Uint16Array(N); S.form = new Uint8Array(N); S.spNames = dj.species;
+  for (let i = 0; i < N; i++) { S.trunk[i] = dv.getUint16(i * 7, true); S.year[i] = dv.getUint16(i * 7 + 2, true); S.sp[i] = dv.getUint16(i * 7 + 4, true); S.form[i] = dv.getUint8(i * 7 + 6); }
+  const tv = new DataView(tb);
   S.N = N; S.lon = new Float64Array(N); S.lat = new Float64Array(N); S.r = new Float32Array(N);
   for (let i = 0; i < N; i++) { S.lon[i] = tv.getFloat32(i * 10, true); S.lat[i] = tv.getFloat32(i * 10 + 4, true); S.r[i] = tv.getUint16(i * 10 + 8, true) / 10; }
   const ev = new DataView(eb), M = eb.byteLength / 10;
@@ -88,7 +91,7 @@ function initMap() {
     getTooltip: ({ layer, index }) => { if (!layer || !["crowns", "crowns3d", "cones"].includes(layer.id) || index < 0) return null;
       const i = layer.id === "crowns3d" ? S.v3.idx[index] : layer.id === "cones" ? S.v3.cones.idx[index] : index, N = S.N;
       if (i >= N) return { text: "Your new tree · 8 m crown" };
-      const sz = S.size[S.root[i]]; return { text: `${S.gnames[S.genus[i]]} · crown ${(2 * S.r[i]).toFixed(0)} m\n${sz > 1 ? `group of ${fmt(sz)} trees` : "alone in the lava"}`,
+      const sz = S.size[S.root[i]]; return { text: `${S.spNames[S.sp[i]]}${S.year[i] ? ` · planted ${S.year[i]}` : ""}\ncrown Ø ${(2 * S.r[i]).toFixed(0)} m${S.trunk[i] ? ` · trunk ${S.trunk[i]} cm around` : ""}\n${sz > 1 ? `in a group of ${fmt(sz)} trees` : "alone in the lava"}`,
         style: { background: "#fff", color: "#1f1a17", fontSize: "12px", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,.15)", padding: "6px 9px" } }; }, getCursor: ({ isHovering }) => S.tool ? "crosshair" : isHovering ? "pointer" : "grab" });
   map.addControl(overlay);
 }
@@ -132,7 +135,7 @@ const Z3 = 14;                                         // from this zoom on, cro
 const crownH = r => Math.max(3, r * 1.15), BASE = 3;  // crown thickness and trunk height (m): a sketch, the register has no heights
 // crown shape by genus: 0 round · 1 tall oval (lime, hornbeam) · 2 broad dome (oak, plane, chestnut) · 3 narrow column (poplar, birch, ginkgo) · 4 cone (conifers) · 5 small round (fruit trees, rowan)
 function shape(i) {                                     // i: drawn-tree index → crown centre z, scales, trunk height, top z, cone?
-  const N = S.N, r = i < N ? S.r[i] : S.added[i - N].r, h = crownH(r), k = i < N ? S.gshape[S.genus[i]] : 0;
+  const N = S.N, r = i < N ? S.r[i] : S.added[i - N].r, h = crownH(r), k = i < N ? (S.form[i] !== 255 ? S.form[i] : S.gshape[S.genus[i]]) : 0;
   if (k === 1) return { cz: BASE + 0.8 * h, sx: 0.85 * r, sz: 0.8 * h, trunk: BASE + 0.5 * h, top: BASE + 1.6 * h };
   if (k === 2) return { cz: BASE + 0.45 * h, sx: 1.05 * r, sz: 0.45 * h, trunk: BASE + 0.3 * h, top: BASE + 0.9 * h };
   if (k === 3) return { cz: 0.7 * BASE + 1.1 * h, sx: 0.5 * r, sz: 1.1 * h, trunk: BASE + 0.6 * h, top: 0.7 * BASE + 2.2 * h };
@@ -178,7 +181,8 @@ function visible() {                                    // trees in view (3D dra
   const ell = [], cone = []; idx.forEach(i => (shape(i).cone ? cone : ell).push(i));
   const n = idx.length, tpos = new Float32Array(n * 3), tsc = new Float32Array(n * 3);     // trunks: from the ground into the crown
   idx.forEach((i, k) => { const r = i < N ? S.r[i] : S.added[i - N].r; tpos[3 * k] = i < N ? S.lon[i] : S.added[i - N].lon; tpos[3 * k + 1] = i < N ? S.lat[i] : S.added[i - N].lat;
-    tsc[3 * k] = tsc[3 * k + 1] = Math.min(0.55, 0.12 + r * 0.05); tsc[3 * k + 2] = shape(i).trunk; });
+    const tr = i < N && S.trunk[i] ? S.trunk[i] / (2 * Math.PI) / 100 : 0.1 + r * 0.03;   // real trunk radius from the circumference
+    tsc[3 * k] = tsc[3 * k + 1] = Math.max(0.08, Math.min(1.1, tr)); tsc[3 * k + 2] = shape(i).trunk; });
   S.v3 = { ...mkSet(ell), cones: mkSet(cone), n, tpos, tsc, ver: (S.v3?.ver || 0) + 1 };
   // dashed jumps between crowns in view; the selected group's jumps are drawn stronger
   const inV = new Uint8Array(N + NA + S.NP); idx.forEach(i => inV[i < N ? i : i + S.NP] = 1);
