@@ -4,7 +4,7 @@
 const $ = s => document.querySelector(s);
 const fmt = n => Math.round(n).toLocaleString("en-GB");
 const KX = 111320 * Math.cos(53.55 * Math.PI / 180), KY = 111320;
-const C = { reach: [198, 255, 106], g50: [127, 211, 107], g10: [79, 158, 88], g2: [58, 110, 67], alone: [74, 64, 56], newt: [255, 214, 90] };
+const C = { reach: [255, 176, 0], g50: [22, 128, 68], g10: [64, 168, 96], g2: [140, 200, 140], alone: [196, 188, 180], newt: [226, 0, 122] };
 const SQ = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
 <defs><filter id="g" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feFlood flood-color="#ffd27a" flood-opacity=".8"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
 <g filter="url(#g)" fill="#ff9f43" stroke="#3a1a08" stroke-width="2.5" stroke-linejoin="round">
@@ -70,7 +70,7 @@ function treeColour(i) {
 // ── layers ──
 let map, overlay;
 function initMap() {
-  map = S.map = new maplibregl.Map({ container: "map", style: "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
+  map = S.map = new maplibregl.Map({ container: "map", style: "https://basemaps.cartocdn.com/gl/positron-nolabels-gl-style/style.json",
     center: [9.99, 53.565], zoom: 11.2, pitch: 0, maxPitch: 70, attributionControl: false });
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
   map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "Bäume & Grünplan © FHH/BUKEA (dl-de/by-2-0) · roads © OSM (ODbL) · © CARTO" }), "bottom-right");
@@ -80,10 +80,10 @@ function initMap() {
 function styleBase() {
   for (const l of map.getStyle().layers) {
     try {
-      if (l.type === "background") map.setPaintProperty(l.id, "background-color", "#0d0806");
-      else if (l.type === "fill" && /water/.test(l.id)) map.setPaintProperty(l.id, "fill-color", "#09161a");
-      else if (l.type === "fill") map.setPaintProperty(l.id, "fill-color", "#120b08");
-      else if (l.type === "line" && /road|bridge|tunnel|street|path/.test(l.id)) map.setPaintProperty(l.id, "line-color", "#3b1a0e");
+      if (l.type === "background") map.setPaintProperty(l.id, "background-color", "#f3f1ed");
+      else if (l.type === "fill" && /water/.test(l.id)) map.setPaintProperty(l.id, "fill-color", "#cfe0e8");
+      else if (l.type === "fill") map.setPaintProperty(l.id, "fill-color", "#eeebe6");
+      else if (l.type === "line" && /road|bridge|tunnel|street|path/.test(l.id)) map.setPaintProperty(l.id, "line-color", "#dedad4");
       else if (l.type === "line" && /building/.test(l.id)) map.setLayoutProperty(l.id, "visibility", "none");
       else if (l.type === "fill-extrusion") map.setLayoutProperty(l.id, "visibility", "none");
     } catch (e) {}
@@ -94,11 +94,11 @@ function addLayers() {
   try {
     styleBase();
     map.addSource("parks", { type: "geojson", data: S.parks, promoteId: "id" });
-    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#3f8f2e", "#16402a"], "fill-opacity": 0.85 } });
-    map.addLayer({ id: "parks-l", type: "line", source: "parks", paint: { "line-color": ["case", ["boolean", ["feature-state", "reach"], false], "#c6ff6a", "#2f7a48"], "line-width": 0.8 } });
+    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#ffe3a0", "#d5ead2"], "fill-opacity": 0.9 } });
+    map.addLayer({ id: "parks-l", type: "line", source: "parks", paint: { "line-color": ["case", ["boolean", ["feature-state", "reach"], false], "#f0a500", "#a8cfa4"], "line-width": 0.8 } });
     map.addSource("roads", { type: "geojson", data: S.roadsGeo });
-    map.addLayer({ id: "roads-glow", type: "line", source: "roads", paint: { "line-color": "#ff5a1f", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3, 16, 14], "line-blur": 6, "line-opacity": 0.35 } });
-    map.addLayer({ id: "roads", type: "line", source: "roads", paint: { "line-color": "#ff7a3a", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.7, 16, 3] } });
+    map.addLayer({ id: "roads-glow", type: "line", source: "roads", paint: { "line-color": "#ff5a1f", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 3, 16, 14], "line-blur": 6, "line-opacity": 0.22 } });
+    map.addLayer({ id: "roads", type: "line", source: "roads", paint: { "line-color": "#ff5a1f", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 16, 3] } });
     map.on("click", e => onClick(e));
     return true;
   } catch (e) { console.warn(e); return false; }
@@ -117,15 +117,15 @@ function deckLayers() {
     if (gone) S.rad[i] = 0;
   }
   const L = [new deck.ScatterplotLayer({ id: "crowns", data: { length: N + NA, attributes: { getPosition: { value: S.pos, size: 2 }, getRadius: { value: S.rad, size: 1 }, getFillColor: { value: col, size: 4 } } },
-    radiusUnits: "meters", radiusMinPixels: 0.7, pickable: true, autoHighlight: true, highlightColor: [255, 240, 170, 255], updateTriggers: { getFillColor: S.ver, getRadius: S.ver } })];
+    radiusUnits: "meters", radiusMinPixels: 0.7, pickable: true, autoHighlight: true, highlightColor: [226, 0, 122, 255], updateTriggers: { getFillColor: S.ver, getRadius: S.ver } })];
   if (S.crit) L.push(new deck.ScatterplotLayer({ id: "crit", data: S.crit, getPosition: d => [d.lon, d.lat], getRadius: 18, radiusUnits: "meters", radiusMinPixels: 6,
-    filled: false, stroked: true, getLineColor: [255, 196, 60, 230], lineWidthMinPixels: 2, pickable: true }));
+    filled: false, stroked: true, getLineColor: [226, 0, 122, 220], lineWidthMinPixels: 2, pickable: true }));
   if (S.anim) {
     const { path, k } = S.anim, upto = Math.floor(k), f = k - upto;
     const head = upto + 1 < path.length ? [path[upto][0] + (path[upto + 1][0] - path[upto][0]) * f, path[upto][1] + (path[upto + 1][1] - path[upto][1]) * f] : path[path.length - 1];
     const trail = path.slice(0, upto + 1).concat([head]);
-    L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [255, 240, 160, 230], widthMinPixels: 3, getWidth: 3, widthUnits: "pixels", jointRounded: true, capRounded: true }));
-    L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 14, radiusUnits: "pixels", getFillColor: [255, 230, 120, 70] }));
+    L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [60, 40, 140, 235], widthMinPixels: 3, getWidth: 3, widthUnits: "pixels", jointRounded: true, capRounded: true }));
+    L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 14, radiusUnits: "pixels", getFillColor: [255, 176, 0, 90] }));
     L.push(new deck.IconLayer({ id: "sq", data: [{ p: head, a: S.anim.dir || 0 }], getPosition: d => d.p, getIcon: () => ({ url: SQ, width: 128, height: 128, anchorY: 96 }),
       getSize: 58, sizeUnits: "pixels", billboard: true }));
   }
@@ -207,7 +207,7 @@ function polyDist(f, x, y) {
   }
   return inside ? 0 : best;
 }
-function log(html) { $("#log").innerHTML = html + ` <a href="#" id="reset" style="color:#8e7b6e">reset</a>`; $("#reset").onclick = e => { e.preventDefault(); S.added = []; S.removed.fill(0); S.pos = null; $("#log").innerHTML = ""; refresh(false); select(-1); }; }
+function log(html) { $("#log").innerHTML = html + ` <a href="#" id="reset" style="color:#8a8079">reset</a>`; $("#reset").onclick = e => { e.preventDefault(); S.added = []; S.removed.fill(0); S.pos = null; $("#log").innerHTML = ""; refresh(false); select(-1); }; }
 
 // longest path inside the selected group (or the showcase route)
 function route() {
@@ -252,11 +252,11 @@ function setJump(j) { S.jump = j; $("#jump").value = j; $("#jv").textContent = j
 function curve() {
   const c = S.A.curve, W = 340, H = 120, P = 26, mx = Math.max(...c.map(d => d.groups)), ml = Math.max(...c.map(d => d.largest));
   const X = j => P + (W - P - 8) * j / 4, Y1 = v => H - 18 - (H - 32) * v / mx, Y2 = v => H - 18 - (H - 32) * v / ml;
-  $("#curve").innerHTML = `<polyline fill="none" stroke="#ff7a3a" stroke-width="2" points="${c.map(d => X(d.jump) + "," + Y1(d.groups)).join(" ")}"/>
-    <polyline fill="none" stroke="#c6ff6a" stroke-width="2" points="${c.map(d => X(d.jump) + "," + Y2(d.largest)).join(" ")}"/>
-    ${[0, 1, 2, 3, 4].map(j => `<text x="${X(j)}" y="${H - 4}" fill="#8e7b6e" font-size="10" text-anchor="middle">${j} m</text>`).join("")}
-    <text x="${P}" y="12" fill="#ff7a3a" font-size="10.5">groups: ${fmt(c[0].groups)} → ${fmt(c[c.length - 1].groups)}</text>
-    <text x="${W - 8}" y="12" fill="#c6ff6a" font-size="10.5" text-anchor="end">largest: ${c[0].largest} → ${c[c.length - 1].largest} trees</text>`;
+  $("#curve").innerHTML = `<polyline fill="none" stroke="#ff5a1f" stroke-width="2" points="${c.map(d => X(d.jump) + "," + Y1(d.groups)).join(" ")}"/>
+    <polyline fill="none" stroke="#168044" stroke-width="2" points="${c.map(d => X(d.jump) + "," + Y2(d.largest)).join(" ")}"/>
+    ${[0, 1, 2, 3, 4].map(j => `<text x="${X(j)}" y="${H - 4}" fill="#8a8079" font-size="10" text-anchor="middle">${j} m</text>`).join("")}
+    <text x="${P}" y="12" fill="#e04a12" font-size="10.5">groups: ${fmt(c[0].groups)} → ${fmt(c[c.length - 1].groups)}</text>
+    <text x="${W - 8}" y="12" fill="#168044" font-size="10.5" text-anchor="end">largest: ${c[0].largest} → ${c[c.length - 1].largest} trees</text>`;
 }
 
 async function main() {

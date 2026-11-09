@@ -27,7 +27,7 @@ async function newPage(o) {
   if (process.env.LOCAL) {
     await p.route(/cdn\.jsdelivr\.net/, r => { const u = r.request().url(); const f = u.includes("deck.gl") ? NM + "deck.gl/dist.min.js" : u.endsWith(".css") ? NM + "maplibre-gl/dist/maplibre-gl.css" : NM + "maplibre-gl/dist/maplibre-gl.js";
       r.fulfill({ path: f, contentType: f.endsWith("css") ? "text/css" : "application/javascript" }); });
-    await p.route(/basemaps\.cartocdn/, r => r.fulfill({ contentType: "application/json", body: JSON.stringify({ version: 8, sources: {}, layers: [{ id: "background", type: "background", paint: { "background-color": "#000" } }] }) }));
+    await p.route(/basemaps\.cartocdn/, r => r.fulfill({ contentType: "application/json", body: JSON.stringify({ version: 8, sources: {}, layers: [{ id: "background", type: "background", paint: { "background-color": "#f3f1ed" } }] }) }));
     await p.route(/fonts\.g/, r => r.abort());
   }
   return p;
@@ -48,29 +48,29 @@ const CSS = `
   .panel, .legend, .maplibregl-ctrl-top-right, .maplibregl-ctrl-bottom-right { display: none !important; }
   #map, #glow { inset: 0 !important; }
   .shade { position: absolute; inset: 0; z-index: 4; pointer-events: none;
-    background: linear-gradient(180deg, rgba(13,8,6,.94) 0, rgba(13,8,6,.6) 300px, rgba(13,8,6,0) 470px, rgba(13,8,6,0) 960px, rgba(13,8,6,.75) 1130px, rgba(13,8,6,.95) 1350px); }
-  .v { position: absolute; z-index: 6; left: 54px; right: 54px; font-family: Inter; color: #f6ece4; }
+    background: linear-gradient(180deg, rgba(250,248,245,.96) 0, rgba(250,248,245,.75) 290px, rgba(250,248,245,0) 460px, rgba(250,248,245,0) 960px, rgba(250,248,245,.85) 1120px, rgba(250,248,245,.97) 1350px); }
+  .v { position: absolute; z-index: 6; left: 54px; right: 54px; font-family: Inter; color: #1f1a17; }
   .v.top { top: 48px; }
-  .v .eb { font-size: 19px; letter-spacing: .18em; text-transform: uppercase; color: #a48c7c; font-weight: 600; }
+  .v .eb { font-size: 19px; letter-spacing: .18em; text-transform: uppercase; color: #8a8079; font-weight: 600; }
   .v h1 { font-family: "Bricolage Grotesque", Inter; font-size: 92px; font-weight: 800; line-height: .92; letter-spacing: -.035em; margin: 12px 0 12px; }
-  .v h1 span { color: #ff5a1f; text-shadow: 0 0 34px rgba(255,90,31,.6); }
-  .v .q { font-size: 29px; color: #d9c8bb; line-height: 1.3; max-width: 900px; }
+  .v h1 span { color: #ff5a1f; text-shadow: 0 0 26px rgba(255,90,31,.25); }
+  .v .q { font-size: 29px; color: #4a423c; line-height: 1.3; max-width: 900px; }
   .v.bot { bottom: 50px; }
   .v .big { font-family: "Bricolage Grotesque", Inter; font-size: 50px; font-weight: 800; line-height: 1.04; letter-spacing: -.02em; }
-  .v .big b { color: #c6ff6a; } .v .big em { font-style: normal; color: #ff7a3a; }
-  .v .sm { font-size: 24px; color: #d9c8bb; line-height: 1.35; margin-top: 12px; }
-  .v .chips { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 19px; color: #d9c8bb; margin-top: 16px; }
+  .v .big b { color: #168044; } .v .big em { font-style: normal; color: #e04a12; }
+  .v .sm { font-size: 24px; color: #4a423c; line-height: 1.35; margin-top: 12px; }
+  .v .chips { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 19px; color: #4a423c; margin-top: 16px; }
   .v .chips i { display: inline-block; width: 15px; height: 15px; border-radius: 50%; margin-right: 7px; vertical-align: -2px; }
-  .v .att { margin-top: 12px; font-size: 14.5px; color: #8e7b6e; }
-  .card2 { position: absolute; z-index: 7; left: 60px; right: 60px; top: 420px; background: rgba(20,13,10,.92); border: 1px solid rgba(255,140,80,.25); border-radius: 28px;
-    padding: 42px 46px; font-family: Inter; color: #f6ece4; opacity: 0; }
-  .card2 h2 { text-transform: none; color: #f6ece4; font-weight: 800; font-family: "Bricolage Grotesque"; font-size: 56px; margin: 0 0 18px; line-height: 1; letter-spacing: -.02em; } .card2 h2 span { color: #ff5a1f; }
-  .card2 li { font-size: 26px; line-height: 1.38; color: #d9c8bb; margin: 0 0 12px; } .card2 b { color: #fff; }
-  .card2 .url { margin-top: 20px; font-size: 25px; font-weight: 700; color: #c6ff6a; } .card2 .att { margin-top: 8px; font-size: 15px; color: #8e7b6e; }
+  .v .att { margin-top: 12px; font-size: 14.5px; color: #8a8079; }
+  .card2 { position: absolute; z-index: 7; left: 60px; right: 60px; top: 420px; background: rgba(255,255,255,.95); border: 1px solid rgba(255,90,31,.3); box-shadow: 0 20px 60px rgba(60,40,20,.15); border-radius: 28px;
+    padding: 42px 46px; font-family: Inter; color: #1f1a17; opacity: 0; }
+  .card2 h2 { text-transform: none; color: #1f1a17; font-weight: 800; font-family: "Bricolage Grotesque"; font-size: 56px; margin: 0 0 18px; line-height: 1; letter-spacing: -.02em; } .card2 h2 span { color: #ff5a1f; }
+  .card2 li { font-size: 26px; line-height: 1.38; color: #4a423c; margin: 0 0 12px; } .card2 b { color: #1f1a17; }
+  .card2 .url { margin-top: 20px; font-size: 25px; font-weight: 700; color: #168044; } .card2 .att { margin-top: 8px; font-size: 15px; color: #8a8079; }
 `;
-const CHIPS = `<div class="chips"><span><i style="background:#c6ff6a"></i>reachable</span><span><i style="background:#7fd36b"></i>group 50+</span>
-  <span><i style="background:#4f9e58"></i>10–49</span><span><i style="background:#3a6e43"></i>2–9</span><span><i style="background:#4a4038"></i>alone</span>
-  <span><i style="background:#16402a;border:1px solid #2f7a48"></i>park · cemetery · allotment</span><span><i style="background:#ff7a3a"></i>major road</span></div>`;
+const CHIPS = `<div class="chips"><span><i style="background:#ffb000"></i>reachable</span><span><i style="background:#168044"></i>group 50+</span>
+  <span><i style="background:#40a860"></i>10–49</span><span><i style="background:#8cc88c"></i>2–9</span><span><i style="background:#c4bcb4"></i>alone</span>
+  <span><i style="background:#d5ead2;border:1px solid #a8cfa4"></i>park · cemetery · allotment</span><span><i style="background:#ff5a1f"></i>major road</span></div>`;
 const ATT = `<div class="att">Straßenbaumkataster & Digitaler Grünplan © FHH/BUKEA (dl-de/by-2-0) · roads © OpenStreetMap (ODbL) · © CARTO</div>`;
 
 async function open() {
@@ -135,7 +135,7 @@ for (const [name, o] of [
   await scene(p, { ...o, plant: 6, keep: true });
   const after = await p.evaluate(() => ({ size: S.size[S.root[S.N + S.NP]], parks: S.parksOf[S.root[S.N + S.NP]] }));
   await scene(p, { ...o, keep: true, big: `One new tree joins<br><em>${info.a} + ${info.b}</em> trees into <b>${after.size}</b>.`,
-    sm: `A gap of ${info.gap_m} m between two crowns. One tree with an 8 m crown (yellow) closes it, and the largest canopy group in Hamburg grows to ${after.size} trees and ${after.parks} green areas.` });
+    sm: `A gap of ${info.gap_m} m between two crowns. One tree with an 8 m crown (pink) closes it, and the largest canopy group in Hamburg grows to ${after.size} trees and ${after.parks} green areas.` });
   await settle(p); await p.waitForTimeout(800);
   await p.screenshot({ path: `${OUT}/post3_new_tree.png` }); console.log("poster post3_new_tree", after);
   await p.evaluate(() => { S.added = []; S.pos = null; refresh(false); select(-1); });

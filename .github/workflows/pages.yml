@@ -38,7 +38,7 @@ jobs:
       - name: Render
         shell: bash -eo pipefail {0}
         env:
-          POSTERS_ONLY: ${{ contains(github.event.head_commit.message, '[video]') && '' || '1' }}
+          POSTERS_ONLY: ${{ !contains(github.event.head_commit.message, '[video]') && '1' || '' }}
         run: |
           sudo apt-get install -y -q ffmpeg > /dev/null || true
           npm i --no-save playwright@1.48.2 > /dev/null && npx playwright install --with-deps chromium > /dev/null
