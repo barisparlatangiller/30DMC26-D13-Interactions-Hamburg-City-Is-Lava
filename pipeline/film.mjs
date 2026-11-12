@@ -28,6 +28,7 @@ if (process.env.LOCAL) {   // sandbox test without CDN / basemap access
   await p.route(/fonts\.g|openfreemap/, r => r.abort());
 }
 p.on("pageerror", e => console.log("pageerror:", e.message));
+p.setDefaultTimeout(240000);
 await p.goto(URL, { waitUntil: "networkidle" });
 await p.waitForFunction(() => window.S && S.ready, null, { timeout: 180000 });
 const settle = () => p.evaluate(() => new Promise(r => { let d = false; const f = () => { if (!d) { d = true; setTimeout(r, 30); } }; S.map.once("idle", f); S.map.triggerRepaint(); setTimeout(f, 4000); }));
@@ -146,8 +147,13 @@ await scene(plan[sec(25)]); await settle(); await p.waitForTimeout(1500);      /
 await p.evaluate(() => { S.added = []; S.pos = null; S.extResult = null; S.showExt = false; refresh(false); select(-1); });
 for (let n = 0; n < plan.length; n++) {
   if (ONLY ? !ONLY.has(n) : (n < lo || n >= hi)) continue;
-  await scene(plan[n]); await settle();
-  await p.screenshot({ path: `${FR}/f${String(n).padStart(4, "0")}.jpg`, type: "jpeg", quality: 93 });
+  for (let tries = 0; ; tries++) {
+    try {
+      await scene(plan[n]); await settle();
+      await p.screenshot({ path: `${FR}/f${String(n).padStart(4, "0")}.jpg`, type: "jpeg", quality: 93, timeout: 240000 });
+      break;
+    } catch (e) { console.log("retry frame", n, e.message.split("\n")[0]); if (tries >= 2) throw e; await p.waitForTimeout(3000); }
+  }
   if (n % 24 === 0) console.log("frame", n, "/", plan.length, new Date().toISOString());
 }
 console.log(`shard ${SHARD}: frames ${lo}–${hi - 1} of ${plan.length}`);

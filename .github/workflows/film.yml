@@ -9,9 +9,9 @@ permissions:
 jobs:
   frames:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     steps:
@@ -23,11 +23,12 @@ jobs:
         env: { SHARD: "${{ matrix.shard }}", NSHARD: "20" }
         run: |
           npm i --no-save playwright@1.48.2 > /dev/null && npx playwright install --with-deps chromium > /dev/null
-          node pipeline/film.mjs 2>&1 | tee film/render_${SHARD}.log
+          mkdir -p film && node pipeline/film.mjs 2>&1 | tee film/render_${SHARD}.log
       - uses: actions/upload-artifact@v4
         with: { name: "frames-${{ matrix.shard }}", path: film, retention-days: 2 }
   encode:
     needs: frames
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
