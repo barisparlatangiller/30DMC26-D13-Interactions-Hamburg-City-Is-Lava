@@ -1,0 +1,44 @@
+name: film
+# LinkedIn film (pipeline/film.mjs), rendered from the built site on the `film` branch only. Does not deploy Pages.
+on:
+  push:
+    branches: [film]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  frames:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Render frames
+        shell: bash -eo pipefail {0}
+        env: { SHARD: "${{ matrix.shard }}", NSHARD: "20" }
+        run: |
+          npm i --no-save playwright@1.48.2 > /dev/null && npx playwright install --with-deps chromium > /dev/null
+          node pipeline/film.mjs 2>&1 | tee film/render_${SHARD}.log
+      - uses: actions/upload-artifact@v4
+        with: { name: "frames-${{ matrix.shard }}", path: film, retention-days: 2 }
+  encode:
+    needs: frames
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: "frames-*", path: parts }
+      - name: Join and encode
+        run: |
+          sudo apt-get install -y -q ffmpeg > /dev/null || true
+          mkdir -p out/frames && cp parts/*/frames/*.jpg out/frames/
+          echo "frames: $(ls out/frames | wc -l)"
+          ffmpeg -y -loglevel error -framerate 24 -i out/frames/f%04d.jpg -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p -movflags +faststart out/day13_squirrel_film.mp4
+          cp out/frames/f0030.jpg out/cover_street.jpg; cp out/frames/f0380.jpg out/cover_islands.jpg
+          rm -rf out/frames && ls -la out
+      - uses: actions/upload-artifact@v4
+        with: { name: film, path: out, retention-days: 7 }
