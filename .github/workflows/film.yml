@@ -40,7 +40,7 @@ jobs:
           mkdir -p out/frames && cp parts/*/frames/*.jpg out/frames/
           echo "frames: $(ls out/frames | wc -l)"
           ffmpeg -y -loglevel error -framerate 24 -i out/frames/f%04d.jpg -c:v libx264 -preset slow -crf 17 -pix_fmt yuv420p -movflags +faststart out/day13_squirrel_film.mp4
-          cp out/frames/f0030.jpg out/cover_street.jpg; cp out/frames/f0380.jpg out/cover_islands.jpg
+          cp out/frames/f0060.jpg out/cover_street.jpg; cp out/frames/f0880.jpg out/cover_sightings.jpg
           rm -rf out/frames && ls -la out
       - uses: actions/upload-artifact@v4
         with: { name: film, path: out, retention-days: 7 }
