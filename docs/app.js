@@ -4,18 +4,14 @@
 const $ = s => document.querySelector(s);
 const fmt = n => Math.round(n).toLocaleString("en-GB");
 const KX = 111320 * Math.cos(53.55 * Math.PI / 180), KY = 111320;
-const C = { reach: [242, 158, 22], g50: [38, 112, 52], g10: [70, 138, 68], g2: [118, 160, 92], alone: [176, 160, 138], newt: [214, 0, 110] };   // canopy greens by island size · lone trees: bark grey-brown · reachable: amber · new tree: magenta
+const C = { reach: [240, 150, 10], g50: [26, 96, 44], g10: [58, 130, 60], g2: [116, 162, 86], alone: [186, 138, 98], newt: [214, 0, 110] };   // canopy greens by island size · lone trees: bark grey-brown · reachable: amber · new tree: magenta
 const SQ = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-<defs><filter id="g" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feFlood flood-color="#ffd27a" flood-opacity=".8"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-<g filter="url(#g)" fill="#ff9f43" stroke="#3a1a08" stroke-width="2.5" stroke-linejoin="round">
-<path d="M60 104 C26 106 8 78 14 50 C20 22 50 10 64 28 C74 42 64 58 50 54 C44 70 52 90 70 94 Z" fill="#ff8c2a"/>
-<path d="M58 106 C54 88 60 70 74 64 C88 58 98 70 96 86 C94 100 82 108 58 106 Z"/>
-<circle cx="88" cy="54" r="14"/>
-<path d="M80 44 L84 30 L92 42 Z"/>
-<path d="M100 56 L104 58 L100 60" fill="none"/>
+<g stroke="#fff" stroke-width="5" stroke-linejoin="round" paint-order="stroke">
+<path fill="#8f3f17" d="M44 112c-20-2-34-20-30-44 3-20 19-34 33-28 12 5 12 21 2 27-8 5-10 15-4 23 4 6 3 16-1 22z"/>
+<path fill="#a64a1a" d="M50 114c-4-14 0-30 12-40 6-6 8-14 10-22 2-8 8-14 16-14 4-8 8-10 10-6 1 3 0 6-1 8 6 4 10 10 10 18 0 6-4 9-9 9h-6c-2 8-2 18 4 26 4 6 4 14-2 18-8 5-26 6-44 3z"/>
 </g>
-<circle cx="93" cy="51" r="2.6" fill="#1a0a03"/>
-<path d="M84 86 C90 84 94 80 96 76" fill="none" stroke="#3a1a08" stroke-width="2.5" stroke-linecap="round"/>
+<path fill="#c96a35" d="M60 104c2-10 8-18 16-22 4 6 6 14 4 22z" opacity=".55"/>
+<circle cx="99" cy="45" r="3.2" fill="#1b0d05"/>
 </svg>`);
 const S = { jump: 0, roads: false, removed: new Uint8Array(0), added: [], sel: -1, tool: null, ver: 0 };
 window.S = S;
@@ -126,10 +122,10 @@ function addLayers() {
     // public green (Digitaler Grünplan) by kind: parks · cemeteries · allotments; amber when the selected island reaches them
     const kindFill = ["match", ["get", "kind"], "cemetery", "#c9d8c0", "allotment", "#dfe6c3", "#c4dfb4"];
     const kindLine = ["match", ["get", "kind"], "cemetery", "#8faa86", "allotment", "#b3bf86", "#86b673"];
-    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#f8e2b4", kindFill],
+    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#f6ecd2", kindFill],
       "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, 0.92] } });
     map.addLayer({ id: "parks-l", type: "line", source: "parks", paint: { "line-color": ["case", ["boolean", ["feature-state", "reach"], false], "#d98a06", kindLine],
-      "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.4, 16, 1.6] } });
+      "line-width": ["case", ["boolean", ["feature-state", "reach"], false], ["interpolate", ["linear"], ["zoom"], 11, 1, 16, 2.6], ["interpolate", ["linear"], ["zoom"], 11, 0.4, 16, 1.6]] } });
     // allotments: a fine plot pattern from zoom 15, so they read as gardens, not lawns
     map.addLayer({ id: "parks-plots", type: "line", source: "parks", filter: ["==", ["get", "kind"], "allotment"], minzoom: 15,
       paint: { "line-color": "#c9cf9c", "line-width": 0.6, "line-dasharray": [2, 2] } });
@@ -258,10 +254,10 @@ function deckLayers() {
     const P = path.map(p => [p[0], p[1], zz]);
     const head = upto + 1 < P.length ? [P[upto][0] + (P[upto + 1][0] - P[upto][0]) * f, P[upto][1] + (P[upto + 1][1] - P[upto][1]) * f, zz] : P[P.length - 1];
     const trail = P.slice(0, upto + 1).concat([head]);
-    L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [30, 64, 175, 235], getWidth: 4, widthUnits: "pixels", jointRounded: true, capRounded: true }));
+    L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [29, 58, 160, 245], getWidth: 6, widthUnits: "pixels", jointRounded: true, capRounded: true }));
     L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 16, radiusUnits: "pixels", getFillColor: [242, 158, 22, 80] }));
     L.push(new deck.IconLayer({ id: "sq", data: [{ p: head }], getPosition: d => d.p, getIcon: () => ({ url: SQ, width: 128, height: 128, anchorY: 96 }),
-      getSize: 58, sizeUnits: "pixels", billboard: true }));
+      getSize: 46, sizeUnits: "pixels", billboard: true }));
   }
   return L;
 }
@@ -375,7 +371,8 @@ function play(coords, info) {
   map.fitBounds([[x0, y0], [x1, y1]], { padding: 90, pitch: 50, duration: 1500, maxZoom: 17.5 });
   $("#hint").innerHTML = `🐿️ ${info.km.toFixed(2)} km over ${fmt(info.trees)} crowns without touching the ground${info.streets ? ` (${info.area}: ${info.streets.join(" → ")})` : ""}.`;
   const t0 = performance.now() + 1500, dur = Math.max(5000, coords.length * 90);
-  const step = now => { const k = Math.max(0, Math.min(1, (now - t0) / dur)); S.anim = { path: coords, k: k * (coords.length - 1) }; frame(); if (k < 1 && !S.manual) requestAnimationFrame(step); };
+  const id = S.playId = (S.playId || 0) + 1;            // a newer play() or a story step cancels this one
+  const step = now => { if (S.playId !== id) return; const k = Math.max(0, Math.min(1, (now - t0) / dur)); S.anim = { path: coords, k: k * (coords.length - 1) }; frame(); if (k < 1 && !S.manual) requestAnimationFrame(step); };
   if (!S.manual) requestAnimationFrame(step);
 }
 

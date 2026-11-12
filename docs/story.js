@@ -3,15 +3,16 @@
 (() => {
   const $ = s => document.querySelector(s);
   const KEY = {
-    canopy: `<span><i style="background:#267034"></i>long canopy chain</span><span><i style="background:#768f5c"></i>short chain</span><span><i style="background:#b0a08a"></i>no neighbour in reach</span>`,
+    canopy: `<span><i style="background:#1a602c"></i>long canopy chain</span><span><i style="background:#74a256"></i>short chain</span><span><i style="background:#ba8a62"></i>no neighbour in reach</span>`,
     rule: `<span><i style="background:#267034"></i>crown</span><span><i class="dash"></i>possible jump (≤ 2 m)</span><span><i class="park"></i>park · cemetery · allotment</span>`,
-    reach: `<span><i style="background:#f29e16"></i>reachable from here</span><span><i class="park" style="background:#f8e2b4;box-shadow:inset 0 0 0 1px #d98a06"></i>green area on the way</span>`,
-    route: `<span><i style="background:#1e40af;border-radius:2px;height:4px;width:16px"></i>longest path</span><span><i style="background:#f29e16"></i>reachable</span>`,
-    plant: `<span><i style="background:#d6006e"></i>new tree (8 m crown)</span><span><i style="background:#1e40af;border-radius:2px;height:4px;width:16px"></i>longer path</span>`,
+    reach: `<span><i style="background:#f29e16"></i>reachable from here</span><span><i class="park" style="background:#f6ecd2;box-shadow:inset 0 0 0 2px #d98a06"></i>green area on the way</span>`,
+    route: `<span><i style="background:#1d3aa0;border-radius:2px;height:5px;width:16px"></i>longest path</span><span><i style="background:#f29e16"></i>reachable</span>`,
+    plant: `<span><i style="background:#d6006e"></i>new tree (8 m crown)</span><span><i style="background:#1d3aa0;border-radius:2px;height:5px;width:16px"></i>longer path</span>`,
     seen: `<span><i class="sq"></i>red squirrel seen (GBIF)</span><span><i class="park"></i>public green</span><span><i style="background:#267034"></i>street trees</span>`,
   };
   let R, STEPS, cur = -1;
   const fly = (cam, dur = 2600) => S.map.flyTo({ ...cam, duration: matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : dur, essential: true });
+  const bld = v => { if (S.map.getLayer("buildings")) S.map.setPaintProperty("buildings", "fill-extrusion-opacity", v); };
   const clean = () => { S.anim = null; if (S.added.length || S.extResult) { S.added = []; S.pos = null; S.extResult = null; refresh(false); } };
   const pad = () => innerWidth < 760 ? { top: 70, bottom: 300, left: 20, right: 20 } : { top: 80, bottom: 80, left: 480, right: 60 };
 
@@ -37,7 +38,7 @@
         cam: R.rule, set: () => { S.showSight = false; select(-1); } },
       { kick: "3 · The answer", title: `No. The canopy breaks into ${fmt(sq.groups)} islands.`, key: "canopy",
         text: `Darker green marks longer chains of connected crowns. <b>${fmt(sq.alone)} trees</b>, almost 1 in 3, have no neighbour within reach (grey-brown).`,
-        cam: R.inner, set: () => { S.showSight = false; select(-1); } },
+        cam: R.inner, set: () => { S.showSight = false; select(-1); bld(0.35); } },
       { kick: "4 · The largest island", title: `${sq.largest} trees in Stellingen.`, key: "reach",
         text: `Next to the zoo, street trees and <b>${sq.largest_parks} green areas</b> link up. Amber shows everything a squirrel can reach from one tree here.`,
         fit: true, set: () => { S.showSight = false; select(S.routeNode ?? (S.routeNode = routeNode())); } },
@@ -61,9 +62,10 @@
 
   function go(i) {
     i = Math.max(0, Math.min(STEPS.length - 1, i)); const st = STEPS[i], back = i < cur; cur = i;
-    S.manual = false; S.showExt = false; S.showCrit = false; S.anim = null;
+    S.manual = false; S.showExt = false; S.showCrit = false; S.anim = null; S.playId = (S.playId || 0) + 1;
     if (setJump && S.jump !== 2) setJump(2);
     if (st.kick !== "6 · What if" && (back || S.added.length)) clean();
+    bld(S.bOp ?? 0.8);
     let dyn = st.set ? st.set() : null;
     if (st.cam) fly(st.cam); else if (st.fit) S.map.fitBounds(R.box, { padding: pad(), pitch: 52, bearing: -14, duration: 2600, maxZoom: 16 });
     $("#story").classList.toggle("cover", !!st.cover);
