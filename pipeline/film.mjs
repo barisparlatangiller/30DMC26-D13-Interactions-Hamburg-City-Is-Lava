@@ -16,7 +16,7 @@ http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 }).listen(8001);
 
-const URL = "http://localhost:8001/#explore", FR = "film/frames", FPS = 24;
+const URL = "http://localhost:8001/#explore", FR = process.env.CUT === "short" ? "film/frames_short" : "film/frames", FPS = 24;
 fs.mkdirSync(FR, { recursive: true });
 const ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--disable-dev-shm-usage"];
 const br = await chromium.launch({ args: ARGS, ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}) });
@@ -124,34 +124,35 @@ const ROUTE2 = { ...ROUTE, zoom: 15.25, bearing: -8 };
 const ROUTE3 = { ...ROUTE2, zoom: 15.05, bearing: 2 };
 const SEEN = { center: [10.0, 53.58], zoom: 10.85, pitch: 18, bearing: 0 };
 
+const SHORT = process.env.CUT === "short", D = (full, short) => SHORT ? short : full;   // short cut: about 32 s, same story
 const plan = [], sec = s => Math.round(s * FPS);
 const seg = (s, fn) => { const n = sec(s); for (let i = 0; i < n; i++) plan.push(fn(n > 1 ? i / (n - 1) : 1, i / FPS, s)); };
 const fade = (t, s, a = 0.35, b = 0.3) => Math.min(ease(cl(t / a)), ease(cl((s - t) / b)));
 const C1 = `Can a squirrel cross Hamburg<span class="s">without ever touching the ground?</span>`;
 // A 0–4.5 s: one street, crown level; the squirrel waits on its tree
-seg(4.5, (k, t, s) => ({ ...cam(CLOSE0, CLOSE0b, ease(k)), anim: S0, cap: C1, capA: fade(t, s, 0.6, 0.01) }));
+seg(D(4.5, 3.0), (k, t, s) => ({ ...cam(CLOSE0, CLOSE0b, ease(k)), anim: S0, cap: C1, capA: fade(t, s, 0.6, 0.01) }));
 // B 4.5–8.5 s: it runs along the crowns, the camera follows and rises
-seg(4.0, (k, t, s) => ({ ...cam(CLOSE0b, CLOSE1, ease(k)), anim: lerp(S0, S1, ease(k)), cap: C1, capA: fade(t + 1, s + 1, 0.01, 0.4) }));
+seg(D(4.0, 2.6), (k, t, s) => ({ ...cam(CLOSE0b, CLOSE1, ease(k)), anim: lerp(S0, S1, ease(k)), cap: C1, capA: fade(t + 1, s + 1, 0.01, 0.4) }));
 // C 8.5–13 s: up and out to the whole city
-seg(4.5, (k, t, s) => ({ ...cam(CLOSE1, CITY, ease(k)), anim: k < 0.25 ? S1 : null,
+seg(D(4.5, 3.4), (k, t, s) => ({ ...cam(CLOSE1, CITY, ease(k)), anim: k < 0.25 ? S1 : null,
   cap: `<span class="g">228,091</span> street trees<span class="s">Every one in the city register, at its real crown width.</span>`, capA: fade(t - 1.8, s - 1.8) }));
 // D 13–17 s: into the inner city — the canopy breaks into islands
-seg(4.0, (k, t, s) => ({ ...cam(CITY, INNER, ease(k)), bld: lerp(0.8, 0.3, ease(k)),
+seg(D(4.0, 3.4), (k, t, s) => ({ ...cam(CITY, INNER, ease(k)), bld: lerp(0.8, 0.3, ease(k)),
   cap: `They form <span class="g">100,024</span> islands<span class="s">Crowns connect if they touch or are ≤ 2 m apart. Parks are safe ground.</span>`, capA: fade(t - 0.6, s - 0.6) }));
 // E 17–20.5 s: lone trees
-seg(3.5, (k, t, s) => ({ ...cam(INNER, INNER2, ease(k)), bld: 0.3,
+seg(D(3.5, 2.6), (k, t, s) => ({ ...cam(INNER, INNER2, ease(k)), bld: 0.3,
   cap: `<span class="br">1 in 3 trees</span> stands alone<span class="s">${"71,883"} crowns with no neighbour within reach.</span>`, capA: fade(t, s) }));
 // F 20.5–24 s: Stellingen, the largest island lights up
-seg(3.5, (k, t, s) => ({ sel: k > 0.55, ...cam(INNER2, ROUTE, ease(k)), bld: lerp(0.3, 0.8, ease(k)),
+seg(D(3.5, 2.8), (k, t, s) => ({ sel: k > 0.55, ...cam(INNER2, ROUTE, ease(k)), bld: lerp(0.3, 0.8, ease(k)),
   cap: `The largest island<span class="s"><b class="a">324 trees</b> and 36 green areas in Stellingen, next to the zoo.</span>`, capA: fade(t - 1.1, s - 1.1) }));
 // G 24–28.5 s: the squirrel runs the longest path
-seg(4.5, (k, t, s) => ({ sel: true, ...cam(ROUTE, ROUTE2, ease(k)), anim: ease(cl(k * 1.15)), counter: ease(cl(k * 1.15)), capA: fade(t, s + 1, 0.3, 0.01) }));
+seg(D(4.5, 3.6), (k, t, s) => ({ sel: true, ...cam(ROUTE, ROUTE2, ease(k)), anim: ease(cl(k * 1.15)), counter: ease(cl(k * 1.15)), capA: fade(t, s + 1, 0.3, 0.01) }));
 // H 28.5–33 s: five new trees, a longer run
-seg(4.5, (k, t, s) => ({ sel: true, keep: true, ext: true, ...cam(ROUTE2, ROUTE3, ease(k)), anim: ease(cl(k * 1.2)), extCounter: ease(cl(k * 1.2)), capA: fade(t, s, 0.3, 0.3) }));
+seg(D(4.5, 3.6), (k, t, s) => ({ sel: true, keep: true, ext: true, ...cam(ROUTE2, ROUTE3, ease(k)), anim: ease(cl(k * 1.2)), extCounter: ease(cl(k * 1.2)), capA: fade(t, s, 0.3, 0.3) }));
 // I 33–38 s: real sightings appear year by year across the city
-seg(5.0, (k, t, s) => ({ ...cam(ROUTE3, SEEN, ease(cl(k * 1.6))), year: Math.round(lerp(2010, 2026, ease(cl((t - 0.9) / 3.3)))), yrA: fade(t - 0.9, s - 0.9, 0.3, 0.4), capA: fade(t - 0.9, s - 0.9, 0.4, 0.4) }));
+seg(D(5.0, 4.0), (k, t, s) => ({ ...cam(ROUTE3, SEEN, ease(cl(k * 1.6))), year: Math.round(lerp(2010, 2026, ease(cl((t - 0.9) / (s - 1.7))))), yrA: fade(t - 0.9, s - 0.9, 0.3, 0.4), capA: fade(t - 0.9, s - 0.9, 0.4, 0.4) }));
 // J 38–42 s: end card
-seg(4.0, (k, t) => ({ ...SEEN, year: 2026, yrA: 0, capA: 0, fadeA: 1 - ease(cl(t / 0.6)), end: ease(cl(t / 0.6)) }));
+seg(D(4.0, 3.0), (k, t) => ({ ...SEEN, year: 2026, yrA: 0, capA: 0, fadeA: 1 - ease(cl(t / 0.6)), end: ease(cl(t / 0.6)) }));
 
 // ── render ──
 const SHARD = +(process.env.SHARD || 0), NSHARD = +(process.env.NSHARD || 1);
