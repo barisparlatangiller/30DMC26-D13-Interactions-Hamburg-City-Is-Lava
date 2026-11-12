@@ -2,76 +2,92 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The City Is Lava</title>
-<meta name="description" content="#30DayMapChallenge 2026 · Day 13 · Interactions. Can a squirrel cross Hamburg without touching the ground? 228,091 street-tree crowns as a network: two models, roads as lava, plant or remove trees and see the network change.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Can a squirrel cross Hamburg?</title>
+<meta name="description" content="#30DayMapChallenge 2026 · Day 13 · Interactions. Hamburg's 228,091 street trees as one canopy network: where a squirrel can travel without touching the ground, where it cannot, and where squirrels are actually seen.">
+<meta property="og:title" content="Can a squirrel cross Hamburg without touching the ground?">
+<meta property="og:description" content="228,091 street trees, mapped crown by crown. They form 100,024 canopy islands. Explore the network, plant trees and see what changes.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
-<link href="style.css?v=4" rel="stylesheet">
+<link href="style.css?v=10" rel="stylesheet">
 </head>
-<body>
-<div id="map"></div>
-<div id="glow"></div>
+<body class="story-on">
+<div id="map" role="application" aria-label="3D map of Hamburg's street trees"></div>
 
-<aside class="panel" id="panel">
-  <div class="eb">#30DayMapChallenge · Day 13 · Interactions · Hamburg</div>
-  <h1>The City <span>Is Lava</span></h1>
-  <p class="q">Can a squirrel cross Hamburg without touching the ground? Every street tree is a crown (zoom in for 3D); crowns that touch, or are close enough to jump,
-    form a path. Parks, cemeteries and allotments are safe islands. The rest is lava.</p>
+<header class="top">
+  <a class="brand" href="#" id="brand"><span class="dot"></span>Can a squirrel cross Hamburg?</a>
+  <nav class="modes" aria-label="Mode"><button id="m-story" class="on">Story</button><button id="m-explore">Explore</button></nav>
+</header>
+
+<!-- ── story ── -->
+<section class="story" id="story" aria-live="polite">
+  <div class="kick" id="s-kick">#30DayMapChallenge · Day 13 · Interactions</div>
+  <h1 id="s-title">Can a squirrel cross Hamburg without touching the ground?</h1>
+  <p id="s-text">Hamburg records every street tree: where it stands, how wide its crown is, its trunk and its species. 228,091 trees. Do they connect?</p>
+  <div class="s-key" id="s-key"></div>
+  <div class="s-nav">
+    <button class="ghost" id="s-prev" aria-label="Previous">←</button>
+    <div class="dots" id="s-dots"></div>
+    <button class="go" id="s-next">Start</button>
+  </div>
+  <button class="skip" id="s-skip">Skip to the map</button>
+</section>
+
+<!-- ── explore ── -->
+<aside class="panel" id="panel" aria-label="Explore the canopy network">
+  <div class="grab" id="grab"></div>
+  <h2 class="ph">Explore the canopy network</h2>
+  <p class="lead">Tap a tree or a park to see how far a squirrel gets from there.</p>
 
   <div class="mode">
-    <div class="seg" id="model"><button data-j="0" class="on">Hard Mode<small>crowns must touch</small></button><button data-j="2">Squirrel Mode<small>jumps up to 2 m</small></button></div>
-    <label class="sl">Jump distance <b id="jv">0 m</b><input id="jump" type="range" min="0" max="4" step="0.5" value="0"></label>
-    <label class="tg"><input type="checkbox" id="roads"> <span>Major roads are lava too</span><small>links whose line crosses a motorway, trunk, primary or secondary road are cut</small></label>
-    <label class="sl">3D buildings <b id="bopv">45%</b><input id="bop" type="range" min="0" max="1" step="0.05" value="0.45"></label>
+    <div class="seg" id="model"><button data-j="0">Crowns touch<small>no jumping</small></button><button data-j="2" class="on">Squirrel jumps<small>gaps up to 2 m</small></button></div>
+    <label class="sl">Jump distance <b id="jv">2 m</b><input id="jump" type="range" min="0" max="4" step="0.5" value="2"></label>
+    <label class="tg"><input type="checkbox" id="roads"> <span>Main roads block the way</span><small>cut every link that crosses a motorway, trunk, primary or secondary road</small></label>
+    <label class="tg"><input type="checkbox" id="sightings"> <span>Show real squirrel sightings</span><small>1,057 red-squirrel records from GBIF, 2010–2026</small></label>
+    <label class="sl">Buildings <b id="bopv">80%</b><input id="bop" type="range" min="0" max="1" step="0.05" value="0.8"></label>
   </div>
 
   <div class="kpis" id="kpis"></div>
 
   <div class="tools">
-    <button id="t-plant" class="tool">🌳 Plant a tree</button><button id="t-axe" class="tool">🪓 Remove a tree</button><button id="t-route" class="tool">🐿️ Squirrel route</button>
+    <button id="t-plant" class="tool">🌳 Plant a tree</button><button id="t-axe" class="tool">🪓 Cut a tree</button><button id="t-route" class="tool">🐿️ Longest path</button>
   </div>
-  <button id="t-ext" class="tool ext">🌱 Extend the longest route</button>
+  <button id="t-ext" class="tool ext">🌱 Plant 5 trees to extend the longest path</button>
   <div class="hint" id="hint">Tap a tree or a park to see how far a squirrel gets from there.</div>
   <div id="sel"></div>
 
-  <h2>Critical gaps <span>· one new tree would join two groups</span></h2>
+  <h3>One tree would join two islands <span>· tap to plant it</span></h3>
   <ol id="crit"></ol>
   <div id="log"></div>
 
-  <h2>How far does jumping help?</h2>
-  <svg id="curve" viewBox="0 0 340 120"></svg>
+  <h3>Does jumping further help?</h3>
+  <svg id="curve" viewBox="0 0 340 120" role="img" aria-label="Islands and largest island size by jump distance"></svg>
 
-  <details><summary>Method and limits</summary>
-    <p><b>Trees.</b> Straßenbaumkataster Hamburg: every tree on public streets with a recorded crown diameter (228,091 of 229,013), drawn as a circle.
-      Trees inside parks and on private land are not in the register, so parks count as safe islands instead.</p>
-    <p><b>Links.</b> Hard Mode: crowns touch or overlap. Squirrel Mode: a gap of up to 2 m (a starting assumption to compare, not a measured
-      jump). The slider tries 0–4 m. A crown that reaches a park, cemetery or allotment (Digitaler Grünplan) links to it; touching green areas link.</p>
-    <p><b>Roads.</b> With the switch on, a link whose straight trunk-to-trunk line crosses a major road (OSM) is cut. Crowns can meet above a road,
-      so this is a stricter scenario, not a proof.</p>
-    <p><b>New trees</b> have an 8 m crown. Critical gaps: places where one such tree would link two Squirrel-Mode groups (gaps crossing major roads
-      are skipped).</p>
-    <p><b>Extending the route.</b> The pink rings are up to 5 new trees (8 m crowns) chosen one by one so that the longest canopy path in the largest
-      Squirrel-Mode group grows the most; each joins the group to a tree outside it with gaps of 2 m or less, never across a major road.</p>
-    <p><b>Limits.</b> Crowns are circles from the register's crown diameter; in 3D trunks are as thick as the register's trunk circumference, and the crown shape follows the genus and cultivar (columnar, globe and weeping forms; otherwise tall oval for limes and hornbeams, broad dome for oaks, planes and chestnuts, narrow column for poplars and birches, cone for conifers, small round for fruit trees), and the heights are a sketch,
-      not data. Buildings are OpenStreetMap heights. A dashed line is a possible jump, not an observed squirrel.</p>
-    <p class="fine">Data: Straßenbaumkataster and Digitaler Grünplan © Freie und Hansestadt Hamburg, BUKEA (dl-de/by-2-0) · roads and buildings © OpenStreetMap
-      contributors (ODbL), buildings via OpenFreeMap · basemap © CARTO. Barış Parlatangiller, built with Claude ·
-      <a href="https://github.com/barisparlatangiller/30DMC26-D13-Interactions-Hamburg-City-Is-Lava" target="_blank" rel="noopener">code</a> ·
+  <details><summary>Data, method and limits</summary>
+    <p><b>Trees.</b> Hamburg's street-tree register (Straßenbaumkataster): every tree on public streets with a recorded crown diameter, 228,091 of 229,013.
+      Position, crown width, trunk circumference, species and planting year come from the register. <b>Tree heights are not in the register and are estimated</b> from crown width; crown shapes follow species and cultivar.</p>
+    <p><b>Links.</b> Two crowns are linked if they touch, or, with jumping, if the gap is at most the chosen distance (2 m is an assumption to compare, not a measured squirrel jump). Crowns reaching a park, cemetery or allotment (Digitaler Grünplan) link to it; those areas count as safe ground.</p>
+    <p><b>Main roads.</b> With the switch on, a link whose straight line crosses a major road (OpenStreetMap) is cut. Crowns can meet above a road, so this is a stricter scenario.</p>
+    <p><b>New trees</b> have an 8 m crown. The five suggested trees are chosen one by one to lengthen the longest path the most, with gaps of 2 m or less and never across a major road.</p>
+    <p><b>Sightings.</b> Red squirrel (<i>Sciurus vulgaris</i>) human observations in Hamburg from GBIF, 2010–2026, location uncertainty 100 m or less, open licences (CC0, CC BY, CC BY-NC). Sightings show where people noticed and reported squirrels, not everywhere squirrels live. Private gardens and trees inside parks are not in the tree register.</p>
+    <p><b>Limits.</b> Circles are not branches; a link is a possible path, not an observed squirrel.</p>
+    <p class="fine">Trees and green areas © Freie und Hansestadt Hamburg, BUKEA (dl-de/by-2-0) · sightings via GBIF.org (naturgucker, iNaturalist, observation.org and others; see data/sightings.json) · roads and buildings © OpenStreetMap contributors (ODbL), buildings via OpenFreeMap · basemap © CARTO ·
+      Barış Parlatangiller, built with Claude · <a href="https://github.com/barisparlatangiller/30DMC26-D13-Interactions-Hamburg-City-Is-Lava" target="_blank" rel="noopener">code</a> ·
       <a href="https://barisparlatangiller.github.io/" target="_blank" rel="noopener">all maps</a></p>
   </details>
 </aside>
 
-<div class="legend" id="legend">
-  <span><i style="background:#ea580c"></i>connected (group 50+)</span><span><i style="background:#f97316"></i>10–49</span><span><i style="background:#fdaa64"></i>2–9</span>
-  <span><i style="background:#aad6e8"></i>alone (no jump possible)</span><span><i style="background:#16a34a"></i>reachable from your tap</span><span><i style="background:#e2007a"></i>new tree</span>
-  <span><i style="width:18px;height:0;border-radius:0;border-top:2px dashed #7c2d12"></i>squirrel jump</span><span><i style="width:18px;height:5px;border-radius:2px;background:#c3bdb6"></i>major road</span>
-  <span><i style="background:#e4ece0;border:1px solid #bcd4b6"></i>safe island</span><span><i style="background:#fff;border:2px solid #e2007a"></i>tree that extends the route</span>
+<div class="legend" id="legend" aria-label="Legend">
+  <span><i style="background:#1a602c"></i>long canopy chain</span><span><i style="background:#74a256"></i>short chain</span>
+  <span><i style="background:#ba8a62"></i>no neighbour in reach</span><span><i style="background:#f0960a"></i>reachable</span>
+  <span><i class="sq"></i>squirrel seen</span><span><i style="background:#d6006e"></i>new tree</span>
+  <span><i class="park"></i>park · cemetery · allotment</span>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/deck.gl@9.0.38/dist.min.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=10"></script>
+<script src="story.js?v=10"></script>
 </body>
 </html>
