@@ -1,0 +1,23 @@
+name: film-publish
+# Copies the encoded film from a finished `film` run (run id in .film-publish) to the `film-media` branch.
+on:
+  push:
+    branches: [film]
+    paths: [".film-publish"]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: r
+        run: echo "id=$(tr -dc 0-9 < .film-publish)" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with: { name: film, path: out, run-id: "${{ steps.r.outputs.id }}", github-token: "${{ github.token }}" }
+      - name: Push to film-media
+        run: |
+          cd out && ls -la && git init -q -b film-media && git config user.name Claude && git config user.email noreply@anthropic.com
+          git add . && git commit -qm "Film from run ${{ steps.r.outputs.id }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" film-media

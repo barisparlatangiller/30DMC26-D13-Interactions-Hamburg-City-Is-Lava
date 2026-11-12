@@ -3,6 +3,7 @@ name: film
 on:
   push:
     branches: [film]
+    paths-ignore: [".film-publish", ".github/workflows/film-publish.yml"]
   workflow_dispatch:
 permissions:
   contents: read
