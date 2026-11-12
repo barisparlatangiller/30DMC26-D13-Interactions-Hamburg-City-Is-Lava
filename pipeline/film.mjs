@@ -174,17 +174,17 @@ if (process.env.CUT === "loop") {
   const CUR = await p.evaluate(() => S.A.curve.map(c => [c.jump, c.groups]));
   const islandsAt = j => { for (let i = 1; i < CUR.length; i++) if (j <= CUR[i][0]) { const [a, ga] = CUR[i - 1], [b, gb] = CUR[i]; return ga + (gb - ga) * (j - a) / (b - a); } return CUR[CUR.length - 1][1]; };
   const Q = `Can a squirrel cross Hamburg<span class="s">without ever touching the ground?</span>`;
-  const MID = { center: [9.9585, 53.5745], zoom: 14.75, pitch: 54, bearing: -24 };
+  const MID = { center: [9.9585, 53.5745], zoom: 15.7, pitch: 52, bearing: -24 };
   // 0–2.6 s: crown level, the squirrel hops; the question
   seg(2.6, (k, t, s) => ({ ...cam(CLOSE0, CLOSE0b, ease(k)), anim: lerp(S0, S0 + 3 / (R.n - 1), k), chip: Q, chipA: fade(t, s + 1, 0.25, 0.01), cap: "", capA: 0 }));
   // 2.6–4.8 s: straight up over the inner city; islands show (jump 0 m)
   seg(2.2, (k, t, s) => ({ ...cam(CLOSE0b, MID, ease(k)), jump: k < 0.5 ? 2 : 0, anim: k < 0.2 ? S0 + 3 / (R.n - 1) : null, bld: lerp(0.8, 0.3, ease(k)), chip: Q, chipA: 1 - ease(cl((t - 1.4) / 0.6)),
     meterA: ease(cl((t - 1.6) / 0.5)), islands: islandsAt(0), capA: 0 }));
   // 4.8–10.2 s: the squirrel learns to jump: 0 → 4 m in 0.5 m steps, the map recolours, the count falls
-  seg(5.4, (k, t, s) => { const j = Math.min(4, Math.floor(t / 0.6) * 0.5); return { ...cam(MID, { ...MID, zoom: 14.55, bearing: -32 }, k), jump: j, bld: 0.3,
+  seg(5.4, (k, t, s) => { const j = Math.min(4, Math.floor(t / 0.6) * 0.5); return { ...cam(MID, { ...MID, zoom: 15.5, bearing: -32 }, k), jump: j, bld: 0.3,
     chip: `What if it could jump further?`, chipA: ease(cl(t / 0.3)), meterA: 1, islands: islandsAt(j), capA: 0 }; });
   // 10.2–12 s: the answer
-  seg(1.8, (k, t, s) => ({ ...cam({ ...MID, zoom: 14.55, bearing: -32 }, { ...MID, zoom: 14.45, bearing: -34 }, k), jump: 4, bld: 0.3,
+  seg(1.8, (k, t, s) => ({ ...cam({ ...MID, zoom: 15.5, bearing: -32 }, { ...MID, zoom: 15.4, bearing: -34 }, k), jump: 4, bld: 0.3,
     chip: `No.<span class="s">Even 4 m jumps leave 70,821 islands. Street trees grow in rows, and the rows rarely meet.</span>`, chipA: ease(cl(t / 0.25)), meterA: 1, islands: islandsAt(4), capA: 0 }));
 }
 
