@@ -1,0 +1,18 @@
+name: sightings
+# Fetches GBIF red-squirrel sightings for Hamburg and commits docs/data/sightings.json to the branch that ran it.
+on:
+  workflow_dispatch:
+  push:
+    branches: [redesign]
+    paths: ["pipeline/sightings.py"]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 pipeline/sightings.py
+      - run: |
+          git config user.name Claude && git config user.email noreply@anthropic.com
+          git add docs/data/sightings.json && git commit -m "Data: GBIF red-squirrel sightings for Hamburg" && git push
