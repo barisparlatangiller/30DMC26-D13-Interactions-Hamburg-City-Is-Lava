@@ -1,10 +1,10 @@
-/* The City Is Lava · #30DayMapChallenge 2026 · Day 13 · Interactions · Hamburg
+/* Can a squirrel cross Hamburg? · #30DayMapChallenge 2026 · Day 13 · Interactions · Hamburg
    228,091 street-tree crowns as a network. Groups are recomputed in the browser (union–find) for every model, road rule,
    planted or removed tree. */
 const $ = s => document.querySelector(s);
 const fmt = n => Math.round(n).toLocaleString("en-GB");
 const KX = 111320 * Math.cos(53.55 * Math.PI / 180), KY = 111320;
-const C = { reach: [22, 163, 74], g50: [234, 88, 12], g10: [249, 115, 22], g2: [253, 170, 100], alone: [170, 214, 232], newt: [226, 0, 122] };   // connected: orange · alone: ice blue · reachable: green
+const C = { reach: [242, 158, 22], g50: [38, 112, 52], g10: [70, 138, 68], g2: [118, 160, 92], alone: [176, 160, 138], newt: [214, 0, 110] };   // canopy greens by island size · lone trees: bark grey-brown · reachable: amber · new tree: magenta
 const SQ = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
 <defs><filter id="g" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feFlood flood-color="#ffd27a" flood-opacity=".8"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
 <g filter="url(#g)" fill="#ff9f43" stroke="#3a1a08" stroke-width="2.5" stroke-linejoin="round">
@@ -36,6 +36,8 @@ async function load() {
   for (let i = 0; i < M; i++) { S.ea[i] = ev.getUint32(i * 10, true); S.eb[i] = ev.getUint32(i * 10 + 4, true); S.eg[i] = ev.getUint8(i * 10 + 8) / 50 - 1; S.ef[i] = ev.getUint8(i * 10 + 9); }
   Object.assign(S, { parks, roadsGeo: roads, A, meta, NP: parks.features.length });
   S.removed = new Uint8Array(N + S.NP);
+  try { const sj = await j("data/sightings.json?v=1"); S.sight = sj.rows; S.sightMeta = sj.meta;
+    S.sightDs = Object.fromEntries(sj.meta.datasets.map(d => [d.key.slice(0, 8), d.name || "GBIF dataset"])); } catch (e) { S.sight = null; }
   // grid index over trees (50 m cells) for planting
   S.grid = new Map();
   for (let i = 0; i < N; i++) { const k = gkey(S.lon[i] * KX, S.lat[i] * KY); (S.grid.get(k) || S.grid.set(k, []).get(k)).push(i); }
@@ -82,26 +84,35 @@ function treeColour(i) {
 
 // ── layers ──
 let map, overlay;
+const TIP = { background: "#fff", color: "#1c1b19", fontSize: "12.5px", lineHeight: "1.45", borderRadius: "10px", boxShadow: "0 6px 24px rgba(20,30,20,.18)", padding: "8px 11px", fontFamily: "Inter, sans-serif" };
 function initMap() {
   map = S.map = new maplibregl.Map({ container: "map", style: "https://basemaps.cartocdn.com/gl/positron-nolabels-gl-style/style.json",
     center: [9.99, 53.565], zoom: 11.2, pitch: 0, maxPitch: 70, attributionControl: false });
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
   map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: "Bäume & Grünplan © FHH/BUKEA (dl-de/by-2-0) · roads © OSM (ODbL) · © CARTO" }), "bottom-right");
   overlay = new deck.MapboxOverlay({ interleaved: false, layers: [],
-    getTooltip: ({ layer, index }) => { if (!layer || !["crowns", "crowns3d", "cones"].includes(layer.id) || index < 0) return null;
+    getTooltip: ({ layer, index, object }) => {
+      if (layer && layer.id === "sightings" && object) return { text: `Red squirrel seen ${object[3] ? String(object[3]).padStart(2, "0") + "/" : ""}${object[2]}\n${S.sightDs[object[5]] || "GBIF"}${object[4] ? ` · location ±${object[4]} m` : ""}`, style: TIP };
+      if (!layer || !["crowns", "crowns3d", "cones"].includes(layer.id) || index < 0) return null;
       const i = layer.id === "crowns3d" ? S.v3.idx[index] : layer.id === "cones" ? S.v3.cones.idx[index] : index, N = S.N;
       if (i >= N) return { text: "Your new tree · 8 m crown" };
-      const sz = S.size[S.root[i]]; return { text: `${S.spNames[S.sp[i]]}${S.year[i] ? ` · planted ${S.year[i]}` : ""}\ncrown Ø ${(2 * S.r[i]).toFixed(0)} m${S.trunk[i] ? ` · trunk ${S.trunk[i]} cm around` : ""}\n${sz > 1 ? `in a group of ${fmt(sz)} trees` : "alone in the lava"}`,
-        style: { background: "#fff", color: "#1f1a17", fontSize: "12px", borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,.15)", padding: "6px 9px" } }; }, getCursor: ({ isHovering }) => S.tool ? "crosshair" : isHovering ? "pointer" : "grab" });
+      const sz = S.size[S.root[i]]; return { text: `${S.spNames[S.sp[i]]}${S.year[i] ? ` · planted ${S.year[i]}` : ""}\ncrown Ø ${(2 * S.r[i]).toFixed(0)} m${S.trunk[i] ? ` · trunk ${S.trunk[i]} cm around` : ""}\n${sz > 1 ? `on a canopy island of ${fmt(sz)} trees` : "no neighbour within reach"}`, style: TIP }; }, getCursor: ({ isHovering }) => S.tool ? "crosshair" : isHovering ? "pointer" : "grab" });
   map.addControl(overlay);
+  try {   // daylight: soft sky fill plus a low sun from the south-west, so crowns read as volumes
+    overlay.setProps({ effects: [new deck.LightingEffect({ ambient: new deck.AmbientLight({ color: [255, 255, 255], intensity: 1.05 }),
+      sun: new deck.DirectionalLight({ color: [255, 244, 224], intensity: 1.55, direction: [1, 2, -2.2] }),
+      sky: new deck.DirectionalLight({ color: [205, 222, 255], intensity: 0.45, direction: [-1, -1, -1] }) })] });
+  } catch (e) { console.warn("lighting", e); }
 }
 function styleBase() {
   for (const l of map.getStyle().layers) {
     try {
-      if (l.type === "background") map.setPaintProperty(l.id, "background-color", "#f3f1ed");
-      else if (l.type === "fill" && /water/.test(l.id)) map.setPaintProperty(l.id, "fill-color", "#cfe0e8");
-      else if (l.type === "fill") map.setPaintProperty(l.id, "fill-color", "#eeebe6");
-      else if (l.type === "line" && /road|bridge|tunnel|street|path/.test(l.id)) map.setPaintProperty(l.id, "line-color", "#d9d5cf");
+      if (l.type === "background") map.setPaintProperty(l.id, "background-color", "#f2f0ea");
+      else if (l.type === "fill" && /water/.test(l.id)) map.setPaintProperty(l.id, "fill-color", "#b8d3e3");
+      else if (l.type === "fill" && /park|landcover|landuse|green|wood|grass/.test(l.id)) map.setPaintProperty(l.id, "fill-color", "#e6eadc");
+      else if (l.type === "fill") map.setPaintProperty(l.id, "fill-color", "#eceae3");
+      else if (l.type === "line" && /water|river/.test(l.id)) map.setPaintProperty(l.id, "line-color", "#a9c8db");
+      else if (l.type === "line" && /road|bridge|tunnel|street|path/.test(l.id)) map.setPaintProperty(l.id, "line-color", "#ffffff");
       else if (l.type === "line" && /building/.test(l.id)) map.setLayoutProperty(l.id, "visibility", "none");
       else if (l.type === "fill-extrusion") map.setLayoutProperty(l.id, "visibility", "none");
     } catch (e) {}
@@ -112,20 +123,28 @@ function addLayers() {
   try {
     styleBase();
     map.addSource("parks", { type: "geojson", data: S.parks, promoteId: "id" });
-    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#cdeccf", "#e4ece0"], "fill-opacity": 0.85 } });
-    map.addLayer({ id: "parks-l", type: "line", source: "parks", paint: { "line-color": ["case", ["boolean", ["feature-state", "reach"], false], "#16a34a", "#bcd4b6"], "line-width": 0.8 } });
+    // public green (Digitaler Grünplan) by kind: parks · cemeteries · allotments; amber when the selected island reaches them
+    const kindFill = ["match", ["get", "kind"], "cemetery", "#c9d8c0", "allotment", "#dfe6c3", "#c4dfb4"];
+    const kindLine = ["match", ["get", "kind"], "cemetery", "#8faa86", "allotment", "#b3bf86", "#86b673"];
+    map.addLayer({ id: "parks", type: "fill", source: "parks", paint: { "fill-color": ["case", ["boolean", ["feature-state", "reach"], false], "#f8e2b4", kindFill],
+      "fill-opacity": ["case", ["boolean", ["feature-state", "hover"], false], 1, 0.92] } });
+    map.addLayer({ id: "parks-l", type: "line", source: "parks", paint: { "line-color": ["case", ["boolean", ["feature-state", "reach"], false], "#d98a06", kindLine],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.4, 16, 1.6] } });
+    // allotments: a fine plot pattern from zoom 15, so they read as gardens, not lawns
+    map.addLayer({ id: "parks-plots", type: "line", source: "parks", filter: ["==", ["get", "kind"], "allotment"], minzoom: 15,
+      paint: { "line-color": "#c9cf9c", "line-width": 0.6, "line-dasharray": [2, 2] } });
     // major roads in grey, drawn at roughly their real width (metres by class)
     map.addSource("roads", { type: "geojson", data: S.roadsGeo });
     const wm = ["match", ["get", "fclass"], "motorway", 26, "trunk", 20, "primary", 16, "secondary", 12, 7];
     const px = k => ["max", 0.6, ["*", k, wm]];                       // metres → pixels at lat 53.6 (92.9 m/px at z10)
     map.addLayer({ id: "roads", type: "line", source: "roads", layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": "#c3bdb6", "line-width": ["interpolate", ["exponential", 2], ["zoom"], 10, px(1 / 92.9), 20, px(1024 / 92.9)] } });
+      paint: { "line-color": "#d2cdc5", "line-width": ["interpolate", ["exponential", 2], ["zoom"], 10, px(1 / 92.9), 20, px(1024 / 92.9)] } });
     // 3D buildings (OpenStreetMap via OpenFreeMap), half transparent so the trees stay in front
     try {
       map.addSource("ofm", { type: "vector", url: "https://tiles.openfreemap.org/planet", attribution: "Buildings: OpenFreeMap © OpenMapTiles © OpenStreetMap" });
       map.addLayer({ id: "buildings", type: "fill-extrusion", source: "ofm", "source-layer": "building", minzoom: 13,
-        paint: { "fill-extrusion-color": "#d7d2cb", "fill-extrusion-height": ["coalesce", ["get", "render_height"], 9], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
-          "fill-extrusion-opacity": S.bOp ?? 0.45 } });
+        paint: { "fill-extrusion-color": ["interpolate", ["linear"], ["coalesce", ["get", "render_height"], 9], 0, "#e7e3dc", 40, "#d8d3cb"], "fill-extrusion-height": ["coalesce", ["get", "render_height"], 9], "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+          "fill-extrusion-opacity": S.bOp ?? 0.8, "fill-extrusion-vertical-gradient": true } });
     } catch (e) { console.warn("buildings", e); }
     map.on("click", e => onClick(e));
     return true;
@@ -163,7 +182,9 @@ function colours() {                                    // one colour per drawn 
   S.col = new Uint8Array((N + NA) * 4);
   for (let i = 0; i < N + NA; i++) {
     const node = i < N ? i : i + NP, gone = i < N ? S.removed[i] : S.added[i - N].gone;
-    const c = treeColour(node); S.col[i * 4] = c[0]; S.col[i * 4 + 1] = c[1]; S.col[i * 4 + 2] = c[2]; S.col[i * 4 + 3] = gone ? 0 : 240;
+    let c = treeColour(node);
+    if (i < N && c !== C.reach && c !== C.newt) { const f = 0.88 + ((S.genus[i] * 37 + 11) % 25) / 100; c = [Math.min(255, c[0] * f), Math.min(255, c[1] * f), Math.min(255, c[2] * (0.9 + f / 10))]; }   // genus tint: no two species look the same
+    S.col[i * 4] = c[0]; S.col[i * 4 + 1] = c[1]; S.col[i * 4 + 2] = c[2]; S.col[i * 4 + 3] = gone ? 0 : 240;
   }
   S.colVer = (S.colVer || 0) + 1; S.visKey = null;
 }
@@ -207,21 +228,23 @@ function deckLayers() {
     radiusUnits: "meters", radiusMinPixels: 0.8, pickable: true, autoHighlight: true, highlightColor: [226, 0, 122, 255], updateTriggers: { getFillColor: S.colVer, getRadius: S.colVer } }));
   else {
     const dash = new deck.PathStyleExtension({ dash: true });
-    L.push(new deck.PathLayer({ id: "jumps", data: S.lnA, _pathType: "open", getColor: [124, 45, 18, 230], getWidth: 2, widthUnits: "pixels", getDashArray: [3, 2], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
+    L.push(new deck.PathLayer({ id: "jumps", data: S.lnA, _pathType: "open", getColor: [92, 76, 60, 170], getWidth: 1.6, widthUnits: "pixels", getDashArray: [3, 2], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
     L.push(new deck.SimpleMeshLayer({ id: "cones", data: { length: S.v3.cones.n, attributes: { getPosition: { value: S.v3.cones.pos, size: 3 }, getColor: { value: S.v3.cones.col, size: 4 } } },
       getScale: (_, { index }) => [S.v3.cones.sc[3 * index], S.v3.cones.sc[3 * index + 1], S.v3.cones.sc[3 * index + 2]], mesh: CONE, getOrientation: [0, 0, 0], pickable: true, autoHighlight: true,
       highlightColor: [226, 0, 122, 255], material: { ambient: 0.55, diffuse: 0.6 }, updateTriggers: { getPosition: S.v3.ver, getScale: S.v3.ver, getColor: S.v3.ver } }));
-    L.push(new deck.SimpleMeshLayer({ id: "trunks", data: { length: S.v3.n, attributes: { getPosition: { value: S.v3.tpos, size: 3 } } }, mesh: TRUNK, getColor: [120, 92, 70, 255],
+    L.push(new deck.SimpleMeshLayer({ id: "trunks", data: { length: S.v3.n, attributes: { getPosition: { value: S.v3.tpos, size: 3 } } }, mesh: TRUNK, getColor: [104, 82, 64, 255],
       getOrientation: [0, 0, 0], getScale: (_, { index }) => [S.v3.tsc[3 * index], S.v3.tsc[3 * index + 1], S.v3.tsc[3 * index + 2]], material: { ambient: 0.6, diffuse: 0.5 },
       updateTriggers: { getScale: S.v3.ver } }));
     L.push(new deck.SimpleMeshLayer({ id: "crowns3d", data: { length: S.v3.n, attributes: { getPosition: { value: S.v3.pos, size: 3 }, getColor: { value: S.v3.col, size: 4 } } },
       getScale: (_, { index }) => [S.v3.sc[3 * index], S.v3.sc[3 * index + 1], S.v3.sc[3 * index + 2]],
       mesh: MESH, getOrientation: [0, 0, 0], pickable: true, autoHighlight: true, highlightColor: [226, 0, 122, 255], material: { ambient: 0.55, diffuse: 0.6, shininess: 12, specularColor: [40, 40, 40] },
       updateTriggers: { getPosition: S.v3.ver, getScale: S.v3.ver, getColor: S.v3.ver } }));
-    L.push(new deck.PathLayer({ id: "jumps-sel", data: S.lnB, _pathType: "open", getColor: [21, 128, 61, 255], getWidth: 3, widthUnits: "pixels", getDashArray: [3, 1.6], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
+    L.push(new deck.PathLayer({ id: "jumps-sel", data: S.lnB, _pathType: "open", getColor: [217, 119, 6, 255], getWidth: 3, widthUnits: "pixels", getDashArray: [3, 1.6], dashJustified: true, extensions: [dash], updateTriggers: { getPath: S.v3.ver } }));
   }
-  if (S.crit) L.push(new deck.ScatterplotLayer({ id: "crit", data: S.crit, getPosition: d => [d.lon, d.lat], getRadius: 18, radiusUnits: "meters", radiusMinPixels: 6,
+  if (S.crit && S.showCrit !== false) L.push(new deck.ScatterplotLayer({ id: "crit", data: S.crit, getPosition: d => [d.lon, d.lat], getRadius: 18, radiusUnits: "meters", radiusMinPixels: 6,
     filled: false, stroked: true, getLineColor: [226, 0, 122, 200], lineWidthMinPixels: 2, pickable: true }));
+  if (S.sight && S.showSight) L.push(new deck.ScatterplotLayer({ id: "sightings", data: S.sight, getPosition: d => [d[0], d[1], 1], getRadius: 22, radiusUnits: "meters", radiusMinPixels: 2.6, radiusMaxPixels: 8,
+    filled: true, getFillColor: [176, 64, 20, 235], stroked: true, getLineColor: [255, 255, 255, 230], lineWidthMinPixels: 1, pickable: true, autoHighlight: true, highlightColor: [255, 210, 120, 255] }));
   if (S.ext && S.showExt) {                             // suggested trees that would lengthen the route: pink, pulsing
     const ph = S.manual ? (S.pulse || 0) : performance.now() / 600;
     L.push(new deck.ScatterplotLayer({ id: "ext-ring", data: S.ext, getPosition: d => [d.lon, d.lat, 0.5], getRadius: 9 + 3 * Math.sin(ph), radiusUnits: "meters", radiusMinPixels: 7 + 2 * Math.sin(ph),
@@ -235,8 +258,8 @@ function deckLayers() {
     const P = path.map(p => [p[0], p[1], zz]);
     const head = upto + 1 < P.length ? [P[upto][0] + (P[upto + 1][0] - P[upto][0]) * f, P[upto][1] + (P[upto + 1][1] - P[upto][1]) * f, zz] : P[P.length - 1];
     const trail = P.slice(0, upto + 1).concat([head]);
-    L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [60, 40, 140, 240], getWidth: 4, widthUnits: "pixels", jointRounded: true, capRounded: true }));
-    L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 16, radiusUnits: "pixels", getFillColor: [22, 163, 74, 70] }));
+    L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [30, 64, 175, 235], getWidth: 4, widthUnits: "pixels", jointRounded: true, capRounded: true }));
+    L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 16, radiusUnits: "pixels", getFillColor: [242, 158, 22, 80] }));
     L.push(new deck.IconLayer({ id: "sq", data: [{ p: head }], getPosition: d => d.p, getIcon: () => ({ url: SQ, width: 128, height: 128, anchorY: 96 }),
       getSize: 58, sizeUnits: "pixels", billboard: true }));
   }
@@ -250,7 +273,7 @@ function kpis() {
   const s = S.stats, b = S.base || s;
   const d = (v, w) => v === w ? "" : (v > w ? "+" : "−") + fmt(Math.abs(v - w));
   $("#kpis").innerHTML = `<div class="kpi"><b>${fmt(s.groups)}</b><span>separate canopy groups</span><b class="d">${d(s.groups, b.groups)}</b></div>
-    <div class="kpi"><b>${fmt(s.alone)}</b><span>trees standing alone in the lava</span><b class="d">${d(s.alone, b.alone)}</b></div>
+    <div class="kpi"><b>${fmt(s.alone)}</b><span>trees with no neighbour in reach</span><b class="d">${d(s.alone, b.alone)}</b></div>
     <div class="kpi"><b>${fmt(s.largest)}</b><span>trees in the largest group</span><b class="d">${d(s.largest, b.largest)}</b></div>`;
 }
 function select(node) {
@@ -330,7 +353,7 @@ function route() {
   const ok = (g, f) => g <= S.jump && !(S.roads && (f & 1));
   for (let i = 0; i < S.M; i++) { const a = S.ea[i], b = S.eb[i]; if (S.root[a] === ro && ok(S.eg[i], S.ef[i]) && !S.removed[a] && !S.removed[b] && pos(a) && pos(b)) { add(a, b); add(b, a); } }
   S.added.forEach((t, k) => { const n = N + NP + k; if (S.root[n] !== ro || t.gone) return; for (const l of t.links) if (ok(l.g, l.f) && !(l.b >= N + NP && S.added[l.b - N - NP].gone)) { add(n, l.b); add(l.b, n); } });
-  if (!adj.size) { $("#hint").textContent = "This tree has no neighbour in reach: it stands alone in the lava."; return; }
+  if (!adj.size) { $("#hint").textContent = "This tree has no neighbour within reach: a squirrel here would have to climb down."; return; }
   const far = src => {                                  // Dijkstra (binary heap) over the crown links
     const dist = new Map([[src, 0]]), prev = new Map(), H = [[0, src]], done = new Set(); let best = src;
     const push = e => { H.push(e); let i = H.length - 1; while (i) { const p = (i - 1) >> 1; if (H[p][0] <= H[i][0]) break; [H[p], H[i]] = [H[i], H[p]]; i = p; } };
@@ -372,17 +395,17 @@ function setJump(j) { S.jump = j; $("#jump").value = j; $("#jv").textContent = j
 function curve() {
   const c = S.A.curve, W = 340, H = 120, P = 26, mx = Math.max(...c.map(d => d.groups)), ml = Math.max(...c.map(d => d.largest));
   const X = j => P + (W - P - 8) * j / 4, Y1 = v => H - 18 - (H - 32) * v / mx, Y2 = v => H - 18 - (H - 32) * v / ml;
-  $("#curve").innerHTML = `<polyline fill="none" stroke="#ff5a1f" stroke-width="2" points="${c.map(d => X(d.jump) + "," + Y1(d.groups)).join(" ")}"/>
+  $("#curve").innerHTML = `<polyline fill="none" stroke="#8a6a3e" stroke-width="2" points="${c.map(d => X(d.jump) + "," + Y1(d.groups)).join(" ")}"/>
     <polyline fill="none" stroke="#168044" stroke-width="2" points="${c.map(d => X(d.jump) + "," + Y2(d.largest)).join(" ")}"/>
     ${[0, 1, 2, 3, 4].map(j => `<text x="${X(j)}" y="${H - 4}" fill="#8a8079" font-size="10" text-anchor="middle">${j} m</text>`).join("")}
-    <text x="${P}" y="12" fill="#e04a12" font-size="10.5">groups: ${fmt(c[0].groups)} → ${fmt(c[c.length - 1].groups)}</text>
+    <text x="${P}" y="12" fill="#8a6a3e" font-size="10.5">islands: ${fmt(c[0].groups)} → ${fmt(c[c.length - 1].groups)}</text>
     <text x="${W - 8}" y="12" fill="#168044" font-size="10.5" text-anchor="end">largest: ${c[0].largest} → ${c[c.length - 1].largest} trees</text>`;
 }
 
 async function main() {
   initMap(); await load();
   S.crit = S.A.critical.slice(0, 12);
-  const go = () => { if (S.ready) return true; if (!addLayers()) return false; S.ready = true; setJump(0); return true; };
+  const go = () => { if (S.ready) return true; if (!addLayers()) return false; S.ready = true; setJump(2); return true; };
   map.on("load", go); const p = setInterval(() => { if (S.ready) return clearInterval(p); if (map.isStyleLoaded() && go()) clearInterval(p); }, 300);
   document.querySelectorAll("[data-j]").forEach(b => b.onclick = () => setJump(+b.dataset.j));
   $("#jump").oninput = e => setJump(+e.target.value);
