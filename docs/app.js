@@ -239,7 +239,7 @@ function deckLayers() {
   }
   if (S.crit && S.showCrit !== false) L.push(new deck.ScatterplotLayer({ id: "crit", data: S.crit, getPosition: d => [d.lon, d.lat], getRadius: 18, radiusUnits: "meters", radiusMinPixels: 6,
     filled: false, stroked: true, getLineColor: [226, 0, 122, 200], lineWidthMinPixels: 2, pickable: true }));
-  if (S.sight && S.showSight) L.push(new deck.ScatterplotLayer({ id: "sightings", data: S.sight, getPosition: d => [d[0], d[1], 1], getRadius: 22, radiusUnits: "meters", radiusMinPixels: 2.6, radiusMaxPixels: 8,
+  if (S.sight && S.showSight) L.push(new deck.ScatterplotLayer({ id: "sightings", data: S.sight, getPosition: d => [d[0], d[1], 1], getRadius: 22, radiusUnits: "meters", radiusMinPixels: 4.5, radiusMaxPixels: 9,
     filled: true, getFillColor: [176, 64, 20, 235], stroked: true, getLineColor: [255, 255, 255, 230], lineWidthMinPixels: 1, pickable: true, autoHighlight: true, highlightColor: [255, 210, 120, 255] }));
   if (S.ext && S.showExt) {                             // suggested trees that would lengthen the route: pink, pulsing
     const ph = S.manual ? (S.pulse || 0) : performance.now() / 600;
