@@ -250,16 +250,57 @@ function deckLayers() {
       fontWeight: 800, fontFamily: "Inter, sans-serif", outlineWidth: 4, outlineColor: [255, 255, 255, 255], fontSettings: { sdf: true }, getPixelOffset: [0, -16] }));
   }
   if (S.anim) {
-    const { path, k } = S.anim, upto = Math.floor(k), f = k - upto, zz = S.z3 ? 10 : 0;
-    const P = path.map(p => [p[0], p[1], zz]);
-    const head = upto + 1 < P.length ? [P[upto][0] + (P[upto + 1][0] - P[upto][0]) * f, P[upto][1] + (P[upto + 1][1] - P[upto][1]) * f, zz] : P[P.length - 1];
-    const trail = P.slice(0, upto + 1).concat([head]);
+    // the squirrel sits on the real crown tops and hops from tree to tree; close up it is a small 3D model, further out an icon
+    const { path, k } = S.anim, upto = Math.min(Math.floor(k), path.length - 1), f = Math.min(1, k - upto);
+    if (S.animTopsFor !== path) { S.animTops = path.map(p => topAt(p[0], p[1])); S.animTopsFor = path; }
+    const T = S.animTops, z3 = S.z3, nxt = Math.min(upto + 1, path.length - 1);
+    const lon = path[upto][0] + (path[nxt][0] - path[upto][0]) * f, lat = path[upto][1] + (path[nxt][1] - path[upto][1]) * f;
+    const gap = Math.hypot((path[nxt][0] - path[upto][0]) * KX, (path[nxt][1] - path[upto][1]) * KY);
+    const hop = z3 ? Math.sin(Math.PI * f) * Math.max(1.2, Math.min(4, gap * 0.45)) : 0;
+    const top = z3 ? T[upto] + (T[nxt] - T[upto]) * f : 0, head = [lon, lat, top + hop + 0.3];
+    const trail = path.slice(0, upto + 1).map((p, i) => [p[0], p[1], z3 ? T[i] + 0.4 : 0]).concat([[lon, lat, z3 ? top + 0.4 : 0]]);
     L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [29, 58, 160, 245], getWidth: 6, widthUnits: "pixels", jointRounded: true, capRounded: true }));
-    L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 16, radiusUnits: "pixels", getFillColor: [242, 158, 22, 80] }));
-    L.push(new deck.IconLayer({ id: "sq", data: [{ p: head }], getPosition: d => d.p, getIcon: () => ({ url: SQ, width: 128, height: 128, anchorY: 96 }),
-      getSize: 46, sizeUnits: "pixels", billboard: true }));
+    if (z3) {
+      const mpp = 78271.5 * Math.cos(lat * Math.PI / 180) / 2 ** S.map.getZoom(), sz = Math.max(0.5, 48 * mpp);   // about 48 px long on screen, whatever the zoom
+      const th = Math.atan2((path[nxt][1] - path[upto][1]) * KY, (path[nxt][0] - path[upto][0]) * KX) || S.sqTh || 0; S.sqTh = th;
+      L.push(new deck.ScatterplotLayer({ id: "sq-shadow", data: [[lon, lat, top + 0.25]], getPosition: d => d, getRadius: sz * (0.42 - 0.12 * Math.sin(Math.PI * f)), radiusUnits: "meters",
+        getFillColor: [20, 30, 15, 110 - 50 * Math.sin(Math.PI * f)] }));
+      L.push(new deck.SimpleMeshLayer({ id: "sq3d", data: squirrelParts(lon, lat, head[2], th, sz, f), mesh: MESH, getPosition: d => d.p, getScale: d => d.s, getColor: d => d.c,
+        getOrientation: d => [d.pitch || 0, th * 180 / Math.PI, 0], material: { ambient: 0.6, diffuse: 0.7, shininess: 20, specularColor: [60, 50, 40] } }));
+    } else {
+      L.push(new deck.ScatterplotLayer({ id: "sq-glow", data: [head], getPosition: d => d, getRadius: 16, radiusUnits: "pixels", getFillColor: [242, 158, 22, 80] }));
+      L.push(new deck.IconLayer({ id: "sq", data: [{ p: head }], getPosition: d => d.p, getIcon: () => ({ url: SQ, width: 128, height: 128, anchorY: 96 }),
+        getSize: 46, sizeUnits: "pixels", billboard: true }));
+    }
   }
   return L;
+}
+// crown top (m above ground) of the street tree nearest to a point; parks and open ground: 1 m
+function topAt(lon, lat) {
+  const x = lon * KX, y = lat * KY, cx = Math.floor(x / 50), cy = Math.floor(y / 50); let best = -1, bd = 8;
+  for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) for (const i of S.grid.get(gx + "," + gy) || []) {
+    const d = Math.hypot(S.lon[i] * KX - x, S.lat[i] * KY - y); if (d < bd) { bd = d; best = i; } }
+  return best >= 0 ? shape(best).top : 1;
+}
+// a small red squirrel from ellipsoids: body, belly, head, ears, eye, and a bushy tail; sz = body length in metres, f = hop phase
+function squirrelParts(lon, lat, z, th, sz, f) {
+  const c = Math.cos(th), s = Math.sin(th), up = Math.sin(Math.PI * f);
+  const at = (fx, fy, fz) => [lon + (fx * c - fy * s) * sz / KX, lat + (fx * s + fy * c) * sz / KY, z + fz * sz];
+  const R = [178, 84, 34, 255], D = [140, 60, 22, 255], CR = [238, 214, 172, 255], K = [25, 14, 8, 255];
+  const tail = 0.18 + 0.12 * up;                       // the tail lifts during a hop
+  return [
+    { p: at(-0.02, 0, 0.30), s: [0.40 * sz, 0.21 * sz, 0.22 * sz], c: R, pitch: -10 * up },
+    { p: at(0.04, 0, 0.22), s: [0.28 * sz, 0.16 * sz, 0.13 * sz], c: CR },
+    { p: at(0.36, 0, 0.46 + 0.05 * up), s: [0.17 * sz, 0.14 * sz, 0.15 * sz], c: R },
+    { p: at(0.50, 0, 0.44 + 0.05 * up), s: [0.07 * sz, 0.07 * sz, 0.06 * sz], c: CR },
+    { p: at(0.34, 0.07, 0.63 + 0.05 * up), s: [0.035 * sz, 0.025 * sz, 0.075 * sz], c: D },
+    { p: at(0.34, -0.07, 0.63 + 0.05 * up), s: [0.035 * sz, 0.025 * sz, 0.075 * sz], c: D },
+    { p: at(0.46, 0.085, 0.50 + 0.05 * up), s: [0.028 * sz, 0.02 * sz, 0.028 * sz], c: K },
+    { p: at(0.46, -0.085, 0.50 + 0.05 * up), s: [0.028 * sz, 0.02 * sz, 0.028 * sz], c: K },
+    { p: at(-0.36, 0, 0.42 + tail * 0.4), s: [0.15 * sz, 0.15 * sz, 0.26 * sz], c: D },
+    { p: at(-0.44, 0, 0.72 + tail), s: [0.2 * sz, 0.19 * sz, 0.22 * sz], c: [168, 74, 28, 255] },
+    { p: at(-0.32, 0, 0.86 + tail), s: [0.13 * sz, 0.13 * sz, 0.12 * sz], c: R },
+  ];
 }
 function redraw() { S.ver++; S.colDirty = true; if (overlay) overlay.setProps({ layers: deckLayers() }); }
 function frame() { if (overlay) overlay.setProps({ layers: deckLayers() }); }   // camera / animation only: no recolouring
