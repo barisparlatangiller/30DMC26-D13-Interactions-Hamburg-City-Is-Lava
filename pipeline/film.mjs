@@ -171,17 +171,23 @@ seg(D(4.0, 3.0), (k, t) => ({ ...SEEN, year: 2026, yrA: 0, capA: 0, fadeA: 1 - e
 // ── 12 s loop: the result in one move (the Day 5 recipe) ──
 if (process.env.CUT === "loop") {
   plan.length = 0;
+  await p.evaluate(() => { S.sqPx = 100; });   // the squirrel twice its site size, so it reads on a phone
+  const RC = await p.evaluate(() => S.A.route.coords);
+  const at = q => { const K = q * (RC.length - 1), i = Math.min(RC.length - 2, Math.floor(K)), f = K - i; return [RC[i][0] + (RC[i + 1][0] - RC[i][0]) * f, RC[i][1] + (RC[i + 1][1] - RC[i][1]) * f]; };
+  const follow = (q, base) => { const [x, y] = at(q), [x0, y0] = R.st; return { ...base, center: [base.center[0] + (x - x0), base.center[1] + (y - y0)] }; };   // keep the squirrel in frame
   const CUR = await p.evaluate(() => S.A.curve.map(c => [c.jump, c.groups]));
   const islandsAt = j => { for (let i = 1; i < CUR.length; i++) if (j <= CUR[i][0]) { const [a, ga] = CUR[i - 1], [b, gb] = CUR[i]; return ga + (gb - ga) * (j - a) / (b - a); } return CUR[CUR.length - 1][1]; };
   const Q = `Can a squirrel cross Hamburg<span class="s">without ever touching the ground?</span>`;
   const MID = { center: [9.9585, 53.5745], zoom: 15.7, pitch: 52, bearing: -24 };
   // 0–2.6 s: crown level, the squirrel hops; the question
-  seg(2.6, (k, t, s) => ({ ...cam(CLOSE0, CLOSE0b, ease(k)), anim: lerp(S0, S0 + 3 / (R.n - 1), k), chip: Q, chipA: fade(t, s + 1, 0.25, 0.01), cap: "", capA: 0 }));
+  seg(3.0, (k, t, s) => ({ ...follow(lerp(S0, S0 + 4 / (R.n - 1), k), cam(CLOSE0, CLOSE0b, ease(k))), anim: lerp(S0, S0 + 4 / (R.n - 1), k), chip: Q, chipA: fade(t, s + 1, 0.25, 0.01), cap: "", capA: 0 }));
   // 2.6–4.8 s: straight up over the inner city; islands show (jump 0 m)
-  seg(2.2, (k, t, s) => ({ ...cam(CLOSE0b, MID, ease(k)), jump: k < 0.5 ? 2 : 0, anim: k < 0.2 ? S0 + 3 / (R.n - 1) : null, bld: lerp(0.8, 0.3, ease(k)), chip: Q, chipA: 1 - ease(cl((t - 1.4) / 0.6)),
+  const END = follow(S0 + 4 / (R.n - 1), CLOSE0b), UP = { ...END, zoom: 16.4, pitch: 56 };
+  seg(2.2, (k, t, s) => ({ ...(k < 0.45 ? cam(END, UP, ease(k / 0.45)) : cam(UP, MID, ease((k - 0.45) / 0.55))), jump: k < 0.5 ? 2 : 0,
+    anim: k < 0.42 ? S0 + 4 / (R.n - 1) : null, bld: lerp(0.8, 0.3, ease(k)), chip: Q, chipA: 1 - ease(cl((t - 1.4) / 0.6)),
     meterA: ease(cl((t - 1.6) / 0.5)), islands: islandsAt(0), capA: 0 }));
   // 4.8–10.2 s: the squirrel learns to jump: 0 → 4 m in 0.5 m steps, the map recolours, the count falls
-  seg(5.4, (k, t, s) => { const j = Math.min(4, Math.floor(t / 0.6) * 0.5); return { ...cam(MID, { ...MID, zoom: 15.5, bearing: -32 }, k), jump: j, bld: 0.3,
+  seg(5.0, (k, t, s) => { const j = Math.min(4, Math.floor(t / 0.55) * 0.5); return { ...cam(MID, { ...MID, zoom: 15.5, bearing: -32 }, k), jump: j, bld: 0.3,
     chip: `What if it could jump further?`, chipA: ease(cl(t / 0.3)), meterA: 1, islands: islandsAt(j), capA: 0 }; });
   // 10.2–12 s: the answer
   seg(1.8, (k, t, s) => ({ ...cam({ ...MID, zoom: 15.5, bearing: -32 }, { ...MID, zoom: 15.4, bearing: -34 }, k), jump: 4, bld: 0.3,

@@ -261,7 +261,7 @@ function deckLayers() {
     const trail = path.slice(0, upto + 1).map((p, i) => [p[0], p[1], z3 ? T[i] + 0.4 : 0]).concat([[lon, lat, z3 ? top + 0.4 : 0]]);
     L.push(new deck.PathLayer({ id: "trail", data: [trail], getPath: d => d, getColor: [29, 58, 160, 245], getWidth: 6, widthUnits: "pixels", jointRounded: true, capRounded: true }));
     if (z3) {
-      const mpp = 78271.5 * Math.cos(lat * Math.PI / 180) / 2 ** S.map.getZoom(), sz = Math.max(0.5, 48 * mpp);   // about 48 px long on screen, whatever the zoom
+      const mpp = 78271.5 * Math.cos(lat * Math.PI / 180) / 2 ** S.map.getZoom(), sz = Math.max(0.5, (S.sqPx || 48) * mpp);   // about 48 px long on screen (S.sqPx overrides, e.g. for the film), whatever the zoom
       const th = Math.atan2((path[nxt][1] - path[upto][1]) * KY, (path[nxt][0] - path[upto][0]) * KX) || S.sqTh || 0; S.sqTh = th;
       L.push(new deck.ScatterplotLayer({ id: "sq-shadow", data: [[lon, lat, top + 0.25]], getPosition: d => d, getRadius: sz * (0.42 - 0.12 * Math.sin(Math.PI * f)), radiusUnits: "meters",
         getFillColor: [20, 30, 15, 110 - 50 * Math.sin(Math.PI * f)] }));
