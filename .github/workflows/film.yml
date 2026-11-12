@@ -43,7 +43,7 @@ jobs:
             ls -d parts/frames-$c-* >/dev/null 2>&1 || continue
             d=out/fr_$c; mkdir -p $d; cp parts/frames-$c-*/frames*/*.jpg $d/; echo "$c: $(ls $d | wc -l) frames"
             n=day13_squirrel_film_$c.mp4; [ $c = full ] && n=day13_squirrel_film.mp4; [ $c = loop ] && n=day13_squirrel_12s.mp4
-            ffmpeg -y -loglevel error -framerate 24 -i $d/f%04d.jpg -c:v libx264 -preset slow -crf 19 -maxrate 9M -bufsize 18M -pix_fmt yuv420p -movflags +faststart out/$n
+            ffmpeg -y -loglevel error -framerate 24 -i $d/f%04d.jpg -vf "scale=in_range=full:out_range=tv,format=yuv420p" -c:v libx264 -profile:v main -level 4.0 -preset slow -crf 20 -maxrate 8M -bufsize 16M -r 30 -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc bt709 -tag:v avc1 -movflags +faststart out/$n
           done
           if [ -f out/fr_loop/f0040.jpg ]; then cp out/fr_loop/f0040.jpg out/cover_loop_street.jpg; cp out/fr_loop/f0240.jpg out/cover_loop_islands.jpg; fi
           rm -rf out/fr_* && ls -la out
