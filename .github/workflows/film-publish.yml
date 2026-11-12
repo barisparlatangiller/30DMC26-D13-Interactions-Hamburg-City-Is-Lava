@@ -19,8 +19,7 @@ jobs:
       - name: Re-encode for LinkedIn (under 100 MB)
         run: |
           sudo apt-get install -y -q ffmpeg > /dev/null || true
-          ffmpeg -y -loglevel error -i out/day13_squirrel_film.mp4 -c:v libx264 -preset slow -crf 20 -maxrate 10M -bufsize 20M -pix_fmt yuv420p -movflags +faststart out/film.mp4
-          mv out/film.mp4 out/day13_squirrel_film.mp4 && ls -la out
+          ls -la out   # films are already encoded under 100 MB
       - name: Push to film-media
         run: |
           cd out && ls -la && git init -q -b film-media && git config user.name Claude && git config user.email noreply@anthropic.com
