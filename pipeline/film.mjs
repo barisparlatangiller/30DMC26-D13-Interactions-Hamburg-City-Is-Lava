@@ -16,7 +16,7 @@ http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 }).listen(8001);
 
-const URL = "http://localhost:8001/#explore", FR = process.env.CUT === "short" ? "film/frames_short" : "film/frames", FPS = 24;
+const URL = "http://localhost:8001/#explore", FR = process.env.CUT === "short" ? "film/frames_short" : process.env.CUT === "loop" ? "film/frames_loop" : "film/frames", FPS = 24;
 fs.mkdirSync(FR, { recursive: true });
 const ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--disable-dev-shm-usage"];
 const br = await chromium.launch({ args: ARGS, ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}) });
@@ -48,6 +48,16 @@ await p.addStyleTag({ content: `
   .g { color: #2f6b3a; } .a { color: #c97d05; } .br { color: #9a6a44; } .p { color: #d6006e; } .r { color: #b04014; } .bl { color: #1d3aa0; }
   .yr { position: absolute; z-index: 6; right: 54px; bottom: 120px; font-family: "Source Serif 4", Georgia, serif; font-weight: 700; font-size: 96px; color: #b04014; opacity: 0;
     text-shadow: 0 2px 18px rgba(247,245,240,.9); font-variant-numeric: tabular-nums; }
+  .chip { position: absolute; z-index: 6; left: 50px; right: 50px; top: 70px; font-family: "Source Serif 4", Georgia, serif; font-weight: 700; font-size: 64px; line-height: 1.06; color: #1c1b19; letter-spacing: -.015em; }
+  .chip .s { display: block; font-family: Inter, sans-serif; font-weight: 600; font-size: 26px; color: #4d4943; margin-top: 14px; letter-spacing: 0; }
+  .meter { position: absolute; z-index: 6; left: 50px; right: 50px; bottom: 70px; display: flex; align-items: flex-end; justify-content: space-between; opacity: 0;
+    font-family: Inter, sans-serif; color: #1c1b19; }
+  .meter .n { font-family: "Source Serif 4", Georgia, serif; font-weight: 700; font-size: 132px; line-height: .9; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .meter .l { font-size: 28px; font-weight: 600; color: #4d4943; margin-top: 10px; }
+  .meter .j { text-align: right; } .meter .j b { display: block; font-family: "Source Serif 4", Georgia, serif; font-size: 72px; color: #c97d05; font-variant-numeric: tabular-nums; }
+  .meter .j span { font-size: 24px; font-weight: 600; color: #4d4943; }
+  .bfade { position: absolute; left: 0; right: 0; bottom: 0; height: 460px; z-index: 4; pointer-events: none; opacity: 0;
+    background: linear-gradient(0deg, rgba(247,245,240,.96) 0, rgba(247,245,240,.85) 220px, rgba(247,245,240,0) 460px); }
   .end { position: absolute; inset: 0; z-index: 8; background: #f7f5f0; display: flex; flex-direction: column; justify-content: center; padding: 0 76px; opacity: 0; }
   .end h2 { font-family: "Source Serif 4", Georgia, serif; text-transform: none; font-size: 96px; font-weight: 700; line-height: 1.02; letter-spacing: -.02em; margin: 0; color: #1c1b19; }
   .end h2 span { color: #2f6b3a; }
@@ -57,7 +67,8 @@ await p.addStyleTag({ content: `
 await p.evaluate(() => {
   S.manual = true; S.showExt = false; S.showCrit = false; S.map.resize();
   document.body.classList.remove("story-on");
-  document.body.insertAdjacentHTML("beforeend", `<div class="fade" id="fade"></div><div class="cap" id="cap"></div><div class="yr" id="yr"></div>
+  document.body.insertAdjacentHTML("beforeend", `<div class="fade" id="fade"></div><div class="bfade" id="bfade"></div><div class="cap" id="cap"></div><div class="chip" id="chip"></div><div class="yr" id="yr"></div>
+    <div class="meter" id="meter"><div><div class="n" id="mn"></div><div class="l">separate canopy islands</div></div><div class="j"><b id="mj"></b><span>jump allowed</span></div></div>
     <div class="end" id="end"><h2>We count trees.<br><span>Squirrels count connections.</span></h2>
     <div class="u">Explore the map: <b>barisparlatangiller.github.io</b></div>
     <div class="a2">#30DayMapChallenge · Day 13 · Interactions · Hamburg<br>Street-tree register & Digitaler Grünplan © FHH/BUKEA (dl-de/by-2-0) · sightings via GBIF.org · roads & buildings © OpenStreetMap (ODbL) · © CARTO.
@@ -71,7 +82,7 @@ await p.evaluate(() => {
 
 // ── one frame ──
 const scene = o => p.evaluate(o => {
-  if (S.jump !== 2) setJump(2);
+  const J = o.jump ?? 2; if (S.jump !== J) setJump(J);
   S.manual = true; S.showCrit = false;
   const want = o.sel ? S.routeNode : -1;
   if (!o.keep && want !== S.sel) select(want);
@@ -101,6 +112,9 @@ const scene = o => p.evaluate(o => {
   const cap = document.getElementById("cap"); if (cap.dataset.h !== html) { cap.innerHTML = html; cap.dataset.h = html; }
   cap.style.opacity = o.capA ?? 1; cap.style.transform = `translateY(${(1 - (o.capA ?? 1)) * 14}px)`;
   document.getElementById("fade").style.opacity = o.fadeA ?? 1;
+  const ch = document.getElementById("chip"), chH = o.chip || ""; if (ch.dataset.h !== chH) { ch.innerHTML = chH; ch.dataset.h = chH; } ch.style.opacity = o.chipA ?? (chH ? 1 : 0);
+  const me = document.getElementById("meter"); me.style.opacity = o.meterA || 0; document.getElementById("bfade").style.opacity = o.meterA || 0;
+  if (o.meterA) { document.getElementById("mn").textContent = fmt(Math.round(o.islands)); document.getElementById("mj").textContent = J.toFixed(1) + " m"; }
   document.getElementById("end").style.opacity = o.end || 0;
 }, o);
 
@@ -154,11 +168,31 @@ seg(D(5.0, 4.0), (k, t, s) => ({ ...cam(ROUTE3, SEEN, ease(cl(k * 1.6))), year: 
 // J 38–42 s: end card
 seg(D(4.0, 3.0), (k, t) => ({ ...SEEN, year: 2026, yrA: 0, capA: 0, fadeA: 1 - ease(cl(t / 0.6)), end: ease(cl(t / 0.6)) }));
 
+// ── 12 s loop: the result in one move (the Day 5 recipe) ──
+if (process.env.CUT === "loop") {
+  plan.length = 0;
+  const CUR = await p.evaluate(() => S.A.curve.map(c => [c.jump, c.groups]));
+  const islandsAt = j => { for (let i = 1; i < CUR.length; i++) if (j <= CUR[i][0]) { const [a, ga] = CUR[i - 1], [b, gb] = CUR[i]; return ga + (gb - ga) * (j - a) / (b - a); } return CUR[CUR.length - 1][1]; };
+  const Q = `Can a squirrel cross Hamburg<span class="s">without ever touching the ground?</span>`;
+  const MID = { center: [9.9585, 53.5745], zoom: 14.75, pitch: 54, bearing: -24 };
+  // 0–2.6 s: crown level, the squirrel hops; the question
+  seg(2.6, (k, t, s) => ({ ...cam(CLOSE0, CLOSE0b, ease(k)), anim: lerp(S0, S0 + 3 / (R.n - 1), k), chip: Q, chipA: fade(t, s + 1, 0.25, 0.01), cap: "", capA: 0 }));
+  // 2.6–4.8 s: straight up over the inner city; islands show (jump 0 m)
+  seg(2.2, (k, t, s) => ({ ...cam(CLOSE0b, MID, ease(k)), jump: k < 0.5 ? 2 : 0, anim: k < 0.2 ? S0 + 3 / (R.n - 1) : null, bld: lerp(0.8, 0.3, ease(k)), chip: Q, chipA: 1 - ease(cl((t - 1.4) / 0.6)),
+    meterA: ease(cl((t - 1.6) / 0.5)), islands: islandsAt(0), capA: 0 }));
+  // 4.8–10.2 s: the squirrel learns to jump: 0 → 4 m in 0.5 m steps, the map recolours, the count falls
+  seg(5.4, (k, t, s) => { const j = Math.min(4, Math.floor(t / 0.6) * 0.5); return { ...cam(MID, { ...MID, zoom: 14.55, bearing: -32 }, k), jump: j, bld: 0.3,
+    chip: `What if it could jump further?`, chipA: ease(cl(t / 0.3)), meterA: 1, islands: islandsAt(j), capA: 0 }; });
+  // 10.2–12 s: the answer
+  seg(1.8, (k, t, s) => ({ ...cam({ ...MID, zoom: 14.55, bearing: -32 }, { ...MID, zoom: 14.45, bearing: -34 }, k), jump: 4, bld: 0.3,
+    chip: `No.<span class="s">Even 4 m jumps leave 70,821 islands. Street trees grow in rows, and the rows rarely meet.</span>`, chipA: ease(cl(t / 0.25)), meterA: 1, islands: islandsAt(4), capA: 0 }));
+}
+
 // ── render ──
 const SHARD = +(process.env.SHARD || 0), NSHARD = +(process.env.NSHARD || 1);
 const lo = Math.floor(plan.length * SHARD / NSHARD), hi = Math.floor(plan.length * (SHARD + 1) / NSHARD);
 const ONLY = process.env.FRAMES ? new Set(process.env.FRAMES.split(",").map(Number)) : null;
-await scene(plan[sec(26)]); await settle(); await p.waitForTimeout(1500);      // warm-up: icons and fonts
+await scene(plan[Math.min(sec(26), plan.length - 1)]); await settle(); await p.waitForTimeout(1500);      // warm-up: icons and fonts
 await p.evaluate(() => { S.added = []; S.pos = null; S.extResult = null; S.showExt = false; refresh(false); select(-1); });
 for (let n = 0; n < plan.length; n++) {
   if (ONLY ? !ONLY.has(n) : (n < lo || n >= hi)) continue;
