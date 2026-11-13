@@ -16,12 +16,12 @@ http.createServer((req, res) => {
   fs.createReadStream(f).pipe(res);
 }).listen(8001);
 
-const URL = "http://localhost:8001/#explore", FR = process.env.CUT === "short" ? "film/frames_short" : process.env.CUT === "loop" ? "film/frames_loop" : "film/frames", FPS = 24;
+const URL = "http://localhost:8001/#explore", FR = process.env.OUT || (process.env.CUT === "short" ? "film/frames_short" : process.env.CUT === "loop" ? "film/frames_loop" : "film/frames"), FPS = 24;
 fs.mkdirSync(FR, { recursive: true });
 const ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--disable-dev-shm-usage"];
 const br = await chromium.launch({ args: ARGS, ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}) });
 const NM = process.env.NM || "node_modules/";
-const p = await br.newPage({ viewport: { width: 1080, height: 1350 } });
+const p = await br.newPage({ viewport: { width: 1080, height: 1350 }, deviceScaleFactor: +(process.env.DSF || 1) });   // DSF=2 for HD stills
 p.setDefaultTimeout(240000);
 if (process.env.LOCAL) {   // sandbox test without CDN / basemap access
   await p.route(/cdn\.jsdelivr\.net/, r => { const u = r.request().url(); const f = u.includes("deck.gl") ? NM + "deck.gl/dist.min.js" : u.endsWith(".css") ? NM + "maplibre-gl/dist/maplibre-gl.css" : NM + "maplibre-gl/dist/maplibre-gl.js";
@@ -205,7 +205,7 @@ for (let n = 0; n < plan.length; n++) {
   for (let tries = 0; ; tries++) {
     try {
       await scene(plan[n]); await settle();
-      await p.screenshot({ path: `${FR}/f${String(n).padStart(4, "0")}.jpg`, type: "jpeg", quality: 93, timeout: 240000 });
+      await p.screenshot({ path: `${FR}/f${String(n).padStart(4, "0")}.${process.env.PNG ? "png" : "jpg"}`, ...(process.env.PNG ? { type: "png" } : { type: "jpeg", quality: 93 }), timeout: 240000 });
       break;
     } catch (e) { console.log("retry frame", n, e.message.split("\n")[0]); if (tries >= 2) throw e; await p.waitForTimeout(3000); }
   }
